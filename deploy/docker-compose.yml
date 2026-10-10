@@ -31,7 +31,7 @@ services:
     environment:
       POSTGRES_PASSWORD: leafpeep
       POSTGRES_DB: leafpeep
-    volumes: [pgdata:/var/lib/postgresql/data]
+    volumes: [pgdata:/home/postgres/pgdata/data]
 
   ollama:
     profiles: [ollama]
