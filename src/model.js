@@ -15,7 +15,7 @@ const SCHEMA = {
     is_foliage: { type: 'boolean' },
     stage: { type: 'string', enum: STAGES },
     color_score: { type: 'integer', minimum: 0, maximum: 100 },
-    colors: { type: 'array', items: { type: 'string' }, maxItems: 4 },
+    colors: { type: 'array', items: { type: 'string' }, maxItems: 3 },
     trees: { type: 'string' },
     scene: { type: 'string' },
     note: { type: 'string' },
@@ -31,13 +31,13 @@ Light green, yellow-green and bright sunlit green are still green: a canopy that
 Use stage "past" when leaves are mostly brown, dull or already fallen (score that by how much colour is left).
 Estimate the share honestly; do not round up because the season is autumn.
 stage: green (<15), turning (15-50), near_peak (50-85), peak (85+), or past.
-colors: up to 4 plain colour words you actually see in the leaves.
-trees: your best guess of the tree types, or "unknown".
-scene: one plain, factual sentence describing the trees and their setting (e.g. "a row of tall maples along a lakeside path"), used for search.
-note: one short, friendly sentence a walker would enjoy, under 20 words. No emoji.
+colors: up to 3 plain colour words you actually see in the leaves.
+trees: your best guess of the tree type in 1 to 3 words, or "unknown".
+scene: one plain, factual phrase of at most 15 words describing the trees and their setting (e.g. "a row of tall maples along a lakeside path"), used for search.
+note: one short, friendly sentence a walker would enjoy, at most 12 words. No emoji.
 is_foliage: true only for a real camera photograph of actual trees, leaves or plants. Set it false for drawings, cartoons, flat shapes, test patterns, screenshots, text, and photos with no real plants in them.
 
-Reply with JSON only.`;
+Be brief. Reply with compact JSON only, no markdown.`;
 
 export async function scorePhoto(jpeg) {
   const b64 = jpeg.toString('base64');
@@ -70,7 +70,7 @@ async function viaOpenAI(b64) {
     body: JSON.stringify({
       model: MODEL,
       temperature: 0.2,
-      max_tokens: Number(process.env.MODEL_MAX_TOKENS ?? 400), // the JSON reply is ~150 tokens
+      max_tokens: Number(process.env.MODEL_MAX_TOKENS ?? 300), // the JSON reply is ~80 tokens
       // Some providers (e.g. Google's Gemma endpoint) reject JSON mode; the reply is parsed either way.
       ...(process.env.MODEL_JSON_MODE !== 'false' && { response_format: { type: 'json_object' } }),
       // e.g. MODEL_REASONING=none skips the model's thinking step where the provider supports it (faster replies)
