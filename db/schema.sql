@@ -32,7 +32,7 @@ WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('cell_daily',
   start_offset => INTERVAL '30 days',
-  end_offset   => NULL,
+  end_offset   => INTERVAL '1 day',   -- today stays real-time, so a new photo shows up instantly
   schedule_interval => INTERVAL '5 minutes',
   if_not_exists => TRUE);
 

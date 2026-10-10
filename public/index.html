@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Leaf Peep</title>
+  <meta name="description" content="Snap a tree on your walk. An open model scores its autumn colour and puts it on a shared map of where fall foliage is peaking.">
+  <meta name="theme-color" content="#f3ede2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#14130f" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%23d9542b'/></svg>">
+  <script>try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch{}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..700,50;1,9..144,300..700,50&family=Instrument+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="app">
+    <aside class="panel" id="panel">
+      <div class="grip" aria-hidden="true"></div>
+
+      <header class="brand">
+        <h1>Leaf <em>Peep</em></h1>
+        <p class="tagline">Where the colour is, this week.</p>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch light or dark theme">
+          <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>
+          <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>
+        </button>
+      </header>
+
+      <section class="intro">
+        <p>Point your camera at a tree on your walk. An open model reads how far its leaves have turned and adds it to the map, so everyone knows where to go next.</p>
+      </section>
+
+      <button class="capture" id="captureBtn" type="button">
+        <span class="capture-ring" aria-hidden="true"></span>
+        <span class="capture-label">Score a tree</span>
+      </button>
+      <input id="photoInput" type="file" accept="image/*" capture="environment" hidden>
+      <p class="hint" id="hint">Takes about ten seconds. Then back to the walk.</p>
+
+      <section class="nearby">
+        <h2>Worth the walk</h2>
+        <ol class="spots" id="spots"><li class="empty">No trees scored yet around here. Be the first.</li></ol>
+      </section>
+
+      <figure class="legend" aria-label="Colour scale">
+        <div class="legend-bar"></div>
+        <figcaption><span>green</span><span>turning</span><span>peak</span><span class="past">past</span></figcaption>
+      </figure>
+
+      <footer class="foot">
+        Scored by an open-weight model on our own server. Photos are stripped of GPS; locations are rounded to about a kilometre.
+        <a href="https://github.com/sbis04/leaf-peep" target="_blank" rel="noopener">Source</a>
+      </footer>
+    </aside>
+
+    <div class="map" id="map" role="region" aria-label="Map of scored trees"></div>
+    <div class="pin-banner" id="pinBanner" hidden>Tap the map where you took this photo</div>
+  </main>
+
+  <dialog class="result" id="result">
+    <div class="result-inner">
+      <div class="result-photo"><img id="resultImg" alt=""></div>
+      <div class="result-body">
+        <div class="result-status" id="resultStatus">Reading the leaves…</div>
+        <div class="score-row" id="scoreRow" hidden>
+          <span class="score" id="score">0</span>
+          <span class="score-of">/100</span>
+          <span class="stage" id="stage"></span>
+        </div>
+        <ul class="swatches" id="swatches"></ul>
+        <p class="note" id="note"></p>
+        <p class="trees" id="trees"></p>
+        <button class="done" id="doneBtn" type="button">Back to the walk</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/lite.umd.js"></script>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
