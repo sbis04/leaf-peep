@@ -9,7 +9,7 @@ export const pool = new pg.Pool({
 
 // ~1.1 km grid. Coarsening happens before anything is written, so exact GPS is never stored.
 const CELL = 0.01;
-export const toCell = (v) => Math.round(v / CELL) * CELL;
+export const toCell = (v) => Number((Math.round(v / CELL) * CELL).toFixed(2));
 
 export async function insertSighting(s) {
   await pool.query(
