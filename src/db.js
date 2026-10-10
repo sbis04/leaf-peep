@@ -101,12 +101,18 @@ export async function deleteSighting(id) {
   return rows[0]?.photo_key ?? null;
 }
 
+export async function setPhotoApproved(id, approved) {
+  const { rowCount } = await pool.query('UPDATE sightings SET photo_approved = $2 WHERE id = $1', [id, approved]);
+  return rowCount > 0;
+}
+
 // ---------- admin analytics ----------
 export async function adminSummary() {
   const one = (sql, p = []) => pool.query(sql, p).then((r) => r.rows);
   const [totals] = await one(
     `SELECT (SELECT count(*) FROM sightings)::int AS photos,
             (SELECT count(*) FROM sightings WHERE time > now() - interval '24 hours')::int AS photos_24h,
+            (SELECT count(*) FROM sightings WHERE photo_key IS NOT NULL AND NOT photo_approved)::int AS pending,
             (SELECT count(*) FROM walkers)::int AS walkers,
             (SELECT count(*) FROM walkers WHERE created_at > now() - interval '24 hours')::int AS walkers_24h,
             (SELECT count(*) FROM likes)::int AS likes,
@@ -122,7 +128,7 @@ export async function adminSummary() {
   const stages = await one(
     `SELECT stage, count(*)::int AS n FROM sightings WHERE time > now() - interval '7 days' GROUP BY stage`);
   const recent = await one(
-    `SELECT s.id, s.time, s.color_score, s.stage, s.trees, s.note, s.photo_key, s.cell_lat, s.cell_lng, s.model,
+    `SELECT s.id, s.time, s.color_score, s.stage, s.trees, s.note, s.colors, s.photo_key, s.photo_approved, s.cell_lat, s.cell_lng, s.model,
             w.name AS walker, (SELECT count(*) FROM likes l WHERE l.sighting_id = s.id)::int AS likes
      FROM sightings s LEFT JOIN walkers w ON w.id = s.walker_id
      ORDER BY s.time DESC LIMIT 24`);
@@ -172,10 +178,10 @@ export async function searchCells(q, { days = 21, limit = 8 } = {}) {
               vec.dist, kw.rank AS kw_rank
        FROM vec FULL OUTER JOIN kw ON vec.cell_lat = kw.cell_lat AND vec.cell_lng = kw.cell_lng
      )
-     SELECT f.*, b.trees, b.scene, b.note, b.photo_key, b.color_score, b.stage
+     SELECT f.*, b.trees, b.scene, b.note, b.photo_key, b.color_score, b.stage, b.colors
      FROM fused f
      CROSS JOIN LATERAL (
-       SELECT trees, scene, note, photo_key, color_score, stage FROM recent s
+       SELECT trees, scene, note, photo_key, color_score, stage, colors FROM recent s
        WHERE s.cell_lat = f.cell_lat AND s.cell_lng = f.cell_lng
        ORDER BY s.embedding <=> $1::vector LIMIT 1
      ) b
@@ -211,13 +217,13 @@ export async function cellForecasts({ days = 21, me = null } = {}) {
        FROM d ORDER BY cell_lat, cell_lng, day DESC
      ),
      last_photo AS (
-       SELECT DISTINCT ON (cell_lat, cell_lng) cell_lat, cell_lng, id, walker_id, photo_key, note, trees, stage, time
+       SELECT DISTINCT ON (cell_lat, cell_lng) cell_lat, cell_lng, id, walker_id, photo_key, photo_approved, note, trees, stage, colors, time
        FROM sightings
        WHERE time > now() - make_interval(days => $1)
        ORDER BY cell_lat, cell_lng, time DESC
      )
      SELECT f.cell_lat, f.cell_lng, l.latest, l.last_day, f.slope_per_day, f.days_seen, f.photos, f.best,
-            p.photo_key, p.note, p.trees, p.stage, p.time AS last_time, p.id AS sighting_id, w.name AS walker,
+            p.photo_key, p.photo_approved, p.note, p.trees, p.stage, p.colors, p.time AS last_time, p.id AS sighting_id, w.name AS walker,
             (SELECT count(*) FROM likes k WHERE k.sighting_id = p.id)::int AS likes,
             EXISTS (SELECT 1 FROM likes k WHERE k.sighting_id = p.id AND k.walker_id = $2::uuid) AS liked
      FROM fit f

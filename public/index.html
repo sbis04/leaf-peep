@@ -59,6 +59,7 @@
 
       <section class="board">
         <h2>Top walkers</h2>
+        <p class="me" id="me" hidden>Walking as <b id="meName"></b> · <button type="button" id="meEdit">Change</button></p>
         <ol class="leaders" id="leaders"><li class="empty">No walkers yet. Score a tree to get on the board.</li></ol>
       </section>
 
@@ -96,7 +97,7 @@
   <dialog class="namer" id="namer">
     <form method="dialog" id="namerForm">
       <div class="label">One-time</div>
-      <h3>What should we call you?</h3>
+      <h3 id="namerTitle">What should we call you?</h3>
       <p>Any name you like. It shows on the leaderboard and on your photos. No account, no email. It stays on this phone.</p>
       <input id="nameInput" maxlength="32" autocomplete="nickname" autocapitalize="words" enterkeyhint="done" placeholder="e.g. Leaf Lover" required>
       <p class="namer-error" id="nameError" hidden></p>

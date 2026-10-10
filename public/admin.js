@@ -12,6 +12,8 @@ function colorFor(score, stage) {
   return RAMP.at(-1)[1];
 }
 
+const SW = { red: '#c43d2a', crimson: '#a8233a', scarlet: '#d0342c', orange: '#e0742b', gold: '#d9a521', golden: '#d9a521', yellow: '#e8c33a',
+  amber: '#e0a030', green: '#5e7d4a', 'light green': '#8fb36a', 'yellow-green': '#a8b83a', brown: '#8a6a4f', rust: '#a8481f', bronze: '#a0703a' };
 let token = '';
 try { token = localStorage.getItem('lp.admin') || ''; } catch { /* storage blocked */ }
 const auth = () => ({ authorization: `Bearer ${token}` });
@@ -72,7 +74,7 @@ function render(d) {
     tile('Photos', t.photos, `+${t.photos_24h} in 24h`),
     tile('Walkers', t.walkers, `+${t.walkers_24h} in 24h`),
     tile('Likes', t.likes, `+${t.likes_24h} in 24h`),
-    tile('Spots on the map', t.spots, '~1 km cells'),
+    tile('Photos to review', t.pending, 'private until approved'),
     tile('Avg colour, 24h', t.avg_score_24h ?? '–', 'out of 100'),
   ].join('');
 
@@ -88,10 +90,13 @@ function render(d) {
     const fresh = !first && !seen.has(r.id);
     return `<article class="item ${fresh ? 'fresh' : ''}" data-id="${r.id}">
       ${r.photo ? `<img src="${esc(r.photo)}" alt="" loading="lazy">` : ''}
+      <div class="sw">${(r.colors?.length ? r.colors : ['?']).map((w) => `<i title="${esc(w)}" style="background:${SW[String(w).toLowerCase()] ?? '#b9ad99'}"></i>`).join('')}</div>
       <div class="meta">
         <div class="row"><span class="score" style="color:${colorFor(r.color_score, r.stage)}">${r.color_score}</span><span class="when">${ago(r.time)}</span></div>
         <div class="row"><span class="who">${esc(r.walker ?? 'unknown')}</span><span class="when">♥ ${r.likes}</span></div>
+        <div class="when">${esc(r.note ?? '')}</div>
         <div class="when">${esc(r.trees ?? '')} · ${r.cell_lat.toFixed(2)}, ${r.cell_lng.toFixed(2)}</div>
+        ${r.photo ? `<button class="approve ${r.photo_approved ? 'on' : ''}" type="button" data-id="${r.id}" data-approved="${r.photo_approved}">${r.photo_approved ? 'Public ✓ (hide)' : 'Approve photo'}</button>` : ''}
         <button class="del" type="button" data-id="${r.id}">Delete</button>
       </div></article>`;
   }).join('') : '<p class="empty">No photos yet. They appear here the moment someone scores a tree.</p>';
@@ -140,6 +145,17 @@ document.addEventListener('pointermove', (e) => {
   tip.style.left = `${e.clientX}px`;
   tip.style.top = `${e.clientY}px`;
   tip.hidden = false;
+});
+
+// ---------- approve / hide a photo ----------
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.approve');
+  if (!btn) return;
+  btn.disabled = true;
+  await fetch(`/api/admin/sightings/${btn.dataset.id}/approve`, {
+    method: 'POST', headers: { ...auth(), 'content-type': 'application/json' },
+    body: JSON.stringify({ approved: btn.dataset.approved !== 'true' }),
+  }).catch(() => {});
 });
 
 // ---------- delete (two taps: arm, then confirm) ----------

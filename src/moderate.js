@@ -25,3 +25,9 @@ export async function checkName(name) {
   const hit = Object.entries(LIMITS).find(([label, limit]) => (scores[label] ?? 0) > limit);
   return hit ? `classifier:${hit[0]}` : null;
 }
+
+// For model-written text (notes, scene descriptions): same blocklist and classifier, slightly stricter.
+export async function checkText(text) {
+  if (!text) return null;
+  return checkName(String(text).slice(0, 200));
+}

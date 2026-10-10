@@ -73,3 +73,6 @@ CREATE TABLE IF NOT EXISTS rate_hits (
   at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS rate_hits_bucket_at ON rate_hits (bucket, at DESC);
+
+-- Photos are private until an admin approves them; until then the map shows a colour card.
+ALTER TABLE sightings ADD COLUMN IF NOT EXISTS photo_approved BOOLEAN NOT NULL DEFAULT false;

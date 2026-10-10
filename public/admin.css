@@ -88,3 +88,8 @@ figcaption { display: grid; gap: 2px; }
 }
 
 [hidden] { display: none !important; }
+.item .sw { display: flex; height: 10px; }
+.item .sw i { flex: 1; }
+.item .approve { margin-top: 6px; height: 32px; border-radius: 99px; border: 0; background: var(--ink); color: var(--paper); font: 600 12px var(--sans); cursor: pointer; }
+.item .approve.on { background: transparent; color: var(--c-green); border: 1px solid var(--c-green); }
+.item:has(.approve:not(.on)) img { outline: 3px solid var(--c-amber); outline-offset: -3px; }

@@ -5,11 +5,11 @@ import { timingSafeEqual } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { scorePhoto, stageFor } from './model.js';
 import { warmUp } from './embed.js';
-import { checkName, warmUpModeration } from './moderate.js';
+import { checkName, checkText, warmUpModeration } from './moderate.js';
 import { savePhoto, deletePhoto, photoUrl, localUploadsDir } from './storage.js';
 import {
   insertSighting, cellForecasts, searchCells, backfillEmbeddings, pool, migrate,
-  upsertWalker, getWalker, toggleLike, leaderboard, deleteSighting, adminSummary,
+  upsertWalker, getWalker, toggleLike, leaderboard, deleteSighting, adminSummary, setPhotoApproved,
   hit, countHits, walkerHasPhoto,
 } from './db.js';
 
@@ -17,7 +17,25 @@ const app = express();
 const upload = multer({ limits: { fileSize: 15 * 1024 * 1024 } });
 const events = new EventEmitter(); // 'change' whenever photos or likes change; feeds the admin stream
 
-app.use(express.static('public', { extensions: ['html'] }));
+// Cache busting: every deploy gets a new BUILD id. Pages are never cached; they reference app.js/style.css/admin.*
+// with ?v=BUILD so browsers (and Home Screen apps) always fetch the new code after a deploy.
+import { readFileSync as readSync, statSync } from 'node:fs';
+const BUILD = process.env.BUILD_ID || String(Math.max(...['public/app.js', 'public/style.css', 'public/admin.js', 'public/admin.css']
+  .map((f) => statSync(f).mtimeMs | 0)).toString(36));
+const page = (file) => (req, res) => {
+  const html = readSync(`public/${file}`, 'utf8').replace(/(\/(?:app|demo|admin)\.js|\/(?:style|admin)\.css)(?=["'])/g, `$1?v=${BUILD}`);
+  res.set('cache-control', 'no-cache').type('html').send(html);
+};
+app.get(['/', '/index.html'], page('index.html'));
+app.get(['/admin', '/admin.html'], page('admin.html'));
+app.use(express.static('public', {
+  extensions: ['html'],
+  setHeaders: (res, file) => {
+    // versioned code can be cached for a year; everything else revalidates (cheap 304 via ETag)
+    const versioned = /\.(js|css)$/.test(file) && /[?&]v=/.test(res.req.originalUrl);
+    res.set('cache-control', versioned ? 'public, max-age=31536000, immutable' : 'no-cache');
+  },
+}));
 app.use('/uploads', express.static(localUploadsDir));
 app.use(express.json({ limit: '4kb' }));
 
@@ -113,12 +131,16 @@ app.post('/api/sightings', scoreLimit, upload.single('photo'), async (req, res) 
     return res.status(422).json({ error: "Couldn't spot any leaves in that one. Point the camera at a tree and try again.", ms });
   }
 
-  const { key, url } = await savePhoto(jpeg);
+  // Gemma's own words are checked too, so text hidden in a photo can't put something nasty on the map.
+  if (await checkText(verdict.note)) verdict.note = 'A tree worth a look on your walk.';
+  if (await checkText(verdict.scene)) verdict.scene = 'trees';
+  // The photo is kept for moderation only: it's never in any public response, just the admin dashboard.
+  const { key } = await savePhoto(jpeg);
   const row = await insertSighting({ ...verdict, lat, lng, photoKey: key, walkerId });
   t.saved = Date.now();
   console.log(`score ${verdict.colorScore} · upload ${req.file.size >> 10} KB · resize ${t.resized - t.start} ms · model ${ms} ms · save+embed ${t.saved - t.scored} ms`);
   events.emit('change');
-  res.json({ ...verdict, id: row.id, photo: url, ms });
+  res.json({ ...verdict, id: row.id, ms });
 });
 
 // ---------- map, likes, leaderboard, search ----------
@@ -135,7 +157,9 @@ app.get('/api/cells', async (req, res) => {
     note: c.note,
     photos: Number(c.photos),
     lastSeen: c.last_time,
-    photo: photoUrl(c.photo_key),
+    colors: c.colors ?? [],
+    // only photos an admin has approved are ever public
+    photo: c.photo_approved ? photoUrl(c.photo_key) : null,
     sighting: c.sighting_id,
     by: c.walker,
     likes: c.likes,
@@ -175,7 +199,7 @@ app.get('/api/search', async (req, res) => {
     trees: r.trees,
     scene: r.scene,
     note: r.note,
-    photo: photoUrl(r.photo_key),
+    colors: r.colors ?? [],
     match: { vector: r.dist == null ? null : Number((1 - r.dist).toFixed(3)), keyword: r.kw_rank != null },
   })));
 });
@@ -211,6 +235,13 @@ app.get('/api/admin/stream', admin, async (req, res) => {
   const tick = setInterval(send, 30_000);
   send();
   req.on('close', () => { events.off('change', soon); clearInterval(tick); clearTimeout(timer); });
+});
+
+app.post('/api/admin/sightings/:id/approve', admin, async (req, res) => {
+  if (!isId(req.params.id)) return res.status(400).json({ error: 'Bad id.' });
+  const ok = await setPhotoApproved(req.params.id, req.body?.approved !== false);
+  events.emit('change');
+  res.json({ ok });
 });
 
 app.delete('/api/admin/sightings/:id', admin, async (req, res) => {

@@ -473,3 +473,17 @@ input, textarea, select { font-size: max(16px, 1em); }
   transition: opacity .4s, transform .4s;
 }
 .toast.out { opacity: 0; transform: translate(-50%, -8px); }
+
+.board .me { margin: -4px 0 12px; font-size: 14px; color: var(--ink-2); }
+.board .me b { color: var(--ink); font-weight: 600; }
+.board .me button { border: 0; background: none; padding: 0; color: var(--accent); font: 600 14px var(--sans); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+/* panel children keep their natural height; the panel scrolls instead of squashing them */
+.panel > * { flex-shrink: 0; }
+
+/* colour card in place of a photo: bands of the colours Gemma saw */
+.pop .swatch { display: flex; height: 92px; border-radius: 14px 14px 0 0; overflow: hidden; position: relative; }
+.pop .swatch i { flex: 1; }
+.pop .swatch span { position: absolute; left: 12px; bottom: 10px; padding: 4px 10px; border-radius: 99px;
+  background: rgba(20,16,10,.55); color: #fff; font: 500 11px/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }

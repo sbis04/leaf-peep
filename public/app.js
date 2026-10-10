@@ -72,13 +72,20 @@ saveWalker();
 // If the server no longer knows this name (data reset), forget it so the next photo asks again.
 if (walker.name) {
   fetch(`/api/walkers/${walker.id}`).then((r) => {
-    if (r.status === 404) { walker.name = null; saveWalker(); }
+    if (r.status === 404) { walker.name = null; saveWalker(); showMe(); }
   }).catch(() => {});
 }
 
-function askName() {
+function showMe() {
+  $('me').hidden = !walker.name;
+  $('meName').textContent = walker.name ?? '';
+}
+
+function askName({ rename = false } = {}) {
   return new Promise((resolve) => {
     const dlg = $('namer');
+    $('namerTitle').textContent = rename ? 'Change your name' : 'What should we call you?';
+    dlg.querySelector('.label').textContent = rename ? 'Your name' : 'One-time';
     $('nameInput').value = walker.name ?? '';
     $('nameError').hidden = true;
     const done = (v) => { dlg.close(); resolve(v); };
@@ -94,6 +101,8 @@ function askName() {
         if (!res.ok) throw new Error(data.error || 'Could not save that name.');
         walker.name = data.name;
         saveWalker();
+        showMe();
+        if (rename) { loadLeaders(); loadCells(); }
         done(true);
       } catch (err) {
         $('nameError').textContent = err.message;
@@ -190,7 +199,9 @@ async function loadCells({ fit = false } = {}) {
 function popupHtml(c, color) {
   const ago = timeAgo(c.lastSeen);
   return `<div class="pop">
-    ${c.photo ? `<img src="${c.photo}" alt="Latest photo from this spot" loading="lazy">` : ''}
+    ${c.photo ? `<img src="${c.photo}" alt="Latest photo from this spot" loading="lazy">` : `<div class="swatch" role="img" aria-label="Leaf colours seen here: ${esc((c.colors || []).join(', ') || 'unknown')}">
+      ${(c.colors?.length ? c.colors : ['green']).map((w) => `<i style="background:${swatchFor(w)}"></i>`).join('')}
+      <span>${esc(STAGE_LABEL[c.stage] ?? '')}</span></div>`}
     <div class="pop-body">
       <div class="pop-head"><span class="pop-score" style="color:${color}">${c.score}</span>
         <span class="pop-fc">${esc(c.forecast.label)}</span></div>
@@ -233,6 +244,8 @@ function toast(msg) {
   setTimeout(() => t.classList.add('out'), 2800);
   setTimeout(() => t.remove(), 3300);
 }
+
+$('meEdit').onclick = () => askName({ rename: true });
 
 // ---------- leaderboard ----------
 async function loadLeaders() {
@@ -676,6 +689,7 @@ map.on('popupopen', (e) => {
 
 loadCells({ fit: true }).catch(() => {});
 loadLeaders();
+showMe();
 locate();
 
 // ?demo=<photo-url>: scripted walkthrough for recording (see demo.js)
