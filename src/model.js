@@ -101,4 +101,4 @@ function normalize(r) {
   };
 }
 
-const stageFor = (s) => (s < 15 ? 'green' : s < 50 ? 'turning' : s < 85 ? 'near_peak' : 'peak');
+export const stageFor = (s) => (s < 15 ? 'green' : s < 50 ? 'turning' : s < 85 ? 'near_peak' : 'peak');

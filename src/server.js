@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
-import { scorePhoto } from './model.js';
+import { scorePhoto, stageFor } from './model.js';
 import { savePhoto, photoUrl, localUploadsDir } from './storage.js';
 import { insertSighting, cellForecasts, pool, migrate } from './db.js';
 
@@ -61,7 +61,8 @@ app.get('/api/cells', async (_req, res) => {
     lat: c.cell_lat,
     lng: c.cell_lng,
     score: Math.round(c.latest),
-    stage: c.stage,
+    // The cell's stage follows its average colour; "past" comes from the latest photo since colour alone can't tell.
+    stage: c.stage === 'past' ? 'past' : stageFor(c.latest),
     trees: c.trees,
     note: c.note,
     photos: Number(c.photos),
