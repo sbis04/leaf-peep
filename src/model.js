@@ -53,6 +53,7 @@ async function viaOllama(b64) {
       model: MODEL,
       stream: false,
       think: false,
+      keep_alive: '30m',
       format: SCHEMA,
       options: { temperature: 0.2 },
       messages: [{ role: 'user', content: PROMPT, images: [b64] }],

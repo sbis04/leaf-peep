@@ -257,7 +257,7 @@ async function submit(file, where) {
     await loadCells();
     const cell = cells.find((c) => Math.abs(c.lat - Math.round(where.lat * 100) / 100) < 1e-6 && Math.abs(c.lng - Math.round(where.lng * 100) / 100) < 1e-6);
     centerOn(where.lat, where.lng, 14, true);
-    if (cell) $('doneBtn').onclick = () => { closeResult(); setTimeout(() => cell.marker.openPopup(), 400); };
+    if (cell) $('doneBtn').onclick = () => { closeResult(); focusCell(cell); };
   } catch (err) {
     showError(err.message);
   } finally {
@@ -366,3 +366,12 @@ map.on('dragstart', () => innerWidth <= 820 && $('panel').classList.add('collaps
 
 loadCells({ fit: true }).catch(() => {});
 locate();
+
+// ?demo=<photo-url>: scripted walkthrough for recording (see demo.js)
+const demo = new URLSearchParams(location.search);
+if (demo.has('demo')) {
+  import('/demo.js').then((m) => m.run({
+    mode: demo.get('demo'), photoUrl: demo.get('photo'), query: demo.get('q'), spot: Number(demo.get('spot') ?? 0),
+    submit, where: AT ?? { lat: 40.7794, lng: -73.9632 },
+  }));
+}
