@@ -1,0 +1,100 @@
+// Scores a foliage photo with an open-weight vision model.
+// MODEL_API=ollama  -> Ollama's native API (local Mac, or Ollama on a DigitalOcean Droplet)
+// MODEL_API=openai  -> any OpenAI-compatible endpoint (DigitalOcean Gradient serverless inference, vLLM, ...)
+
+const API = process.env.MODEL_API ?? 'ollama';
+const BASE = process.env.MODEL_URL ?? 'http://localhost:11434';
+const MODEL = process.env.MODEL_NAME ?? 'gemma4:e2b';
+const KEY = process.env.MODEL_KEY;
+
+export const STAGES = ['green', 'turning', 'near_peak', 'peak', 'past'];
+
+const SCHEMA = {
+  type: 'object',
+  properties: {
+    is_foliage: { type: 'boolean' },
+    stage: { type: 'string', enum: STAGES },
+    color_score: { type: 'integer', minimum: 0, maximum: 100 },
+    colors: { type: 'array', items: { type: 'string' }, maxItems: 4 },
+    trees: { type: 'string' },
+    note: { type: 'string' },
+  },
+  required: ['is_foliage', 'stage', 'color_score', 'colors', 'trees', 'note'],
+};
+
+const PROMPT = `You are a fall foliage spotter. Look at the trees in this photo and judge how far along their autumn colour change is.
+
+color_score: 0 = fully green summer leaves, 50 = about half the canopy has turned, 85+ = peak (most leaves vivid red/orange/yellow), and use stage "past" when leaves are mostly brown or already fallen (score that by how much colour is left).
+stage: green (<15), turning (15-50), near_peak (50-85), peak (85+), or past.
+colors: up to 4 plain colour words you actually see in the leaves.
+trees: your best guess of the tree types, or "unknown".
+note: one short, friendly sentence a walker would enjoy, under 20 words. No emoji.
+is_foliage: false if the photo has no trees or leaves in it.
+
+Reply with JSON only.`;
+
+export async function scorePhoto(jpeg) {
+  const b64 = jpeg.toString('base64');
+  const raw = API === 'openai' ? await viaOpenAI(b64) : await viaOllama(b64);
+  return normalize(JSON.parse(extractJson(raw)));
+}
+
+async function viaOllama(b64) {
+  const res = await fetch(`${BASE}/api/chat`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      stream: false,
+      think: false,
+      format: SCHEMA,
+      options: { temperature: 0.2 },
+      messages: [{ role: 'user', content: PROMPT, images: [b64] }],
+    }),
+  });
+  if (!res.ok) throw new Error(`model ${res.status}: ${await res.text()}`);
+  return (await res.json()).message.content;
+}
+
+async function viaOpenAI(b64) {
+  const res = await fetch(`${BASE}/chat/completions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(KEY && { authorization: `Bearer ${KEY}` }) },
+    body: JSON.stringify({
+      model: MODEL,
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: PROMPT },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}` } },
+        ],
+      }],
+    }),
+  });
+  if (!res.ok) throw new Error(`model ${res.status}: ${await res.text()}`);
+  return (await res.json()).choices[0].message.content;
+}
+
+function extractJson(text) {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end < start) throw new Error(`model returned no JSON: ${text.slice(0, 200)}`);
+  return text.slice(start, end + 1);
+}
+
+function normalize(r) {
+  const score = Math.max(0, Math.min(100, Math.round(Number(r.color_score) || 0)));
+  return {
+    isFoliage: r.is_foliage !== false,
+    stage: STAGES.includes(r.stage) ? r.stage : stageFor(score),
+    colorScore: score,
+    colors: (Array.isArray(r.colors) ? r.colors : []).map(String).slice(0, 4),
+    trees: String(r.trees ?? 'unknown').slice(0, 80),
+    note: String(r.note ?? '').slice(0, 160),
+    model: MODEL,
+  };
+}
+
+const stageFor = (s) => (s < 15 ? 'green' : s < 50 ? 'turning' : s < 85 ? 'near_peak' : 'peak');
