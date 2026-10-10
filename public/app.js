@@ -53,6 +53,12 @@ function saveWalker() {
   try { localStorage.setItem('lp.walker', JSON.stringify(walker)); } catch { /* private mode: keep it in memory */ }
 }
 saveWalker();
+// If the server no longer knows this name (data reset), forget it so the next photo asks again.
+if (walker.name) {
+  fetch(`/api/walkers/${walker.id}`).then((r) => {
+    if (r.status === 404) { walker.name = null; saveWalker(); }
+  }).catch(() => {});
+}
 
 function askName() {
   return new Promise((resolve) => {

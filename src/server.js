@@ -61,6 +61,11 @@ app.post('/api/walkers', limiter(20, 'Too many name changes. Try again later.'),
   res.json(await upsertWalker(id, name));
 });
 
+app.get('/api/walkers/:id', async (req, res) => {
+  const w = isId(req.params.id) ? await getWalker(req.params.id) : null;
+  return w ? res.json(w) : res.status(404).json({ error: 'Unknown walker.' });
+});
+
 // ---------- scoring ----------
 app.post('/api/sightings', scoreLimit, upload.single('photo'), async (req, res) => {
   const lat = Number(req.body.lat);
