@@ -307,7 +307,20 @@ $('captureBtn').onclick = async () => {
   openCamera();
 };
 
+// ?fakecam=<video url>: demo/recording only. Plays a looping clip as the viewfinder; shutter and scoring stay real.
+const FAKECAM = new URLSearchParams(location.search).get('fakecam');
+
 async function openCamera() {
+  if (FAKECAM && FAKECAM.startsWith('/demo/')) {
+    const v = $('cameraVideo');
+    v.srcObject = null;
+    v.src = FAKECAM;
+    v.loop = true;
+    $('camera').classList.remove('nocam');
+    $('camera').showModal();
+    v.play().catch(() => {});
+    return;
+  }
   try {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('no camera api');
     stream = await navigator.mediaDevices.getUserMedia({
@@ -328,6 +341,7 @@ function closeCamera() {
   stream?.getTracks().forEach((t) => t.stop());
   stream = null;
   $('cameraVideo').srcObject = null;
+  if (FAKECAM) { $('cameraVideo').pause(); $('cameraVideo').removeAttribute('src'); }
   if ($('camera').open) $('camera').close();
 }
 $('cameraClose').onclick = closeCamera;
