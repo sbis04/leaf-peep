@@ -8,10 +8,10 @@
 
 ## What it does
 
-| Score a tree | Hybrid search | Light and dark |
-|---|---|---|
-| ![](docs/img/iphone-light-result.png) | ![](docs/img/iphone-light-search.png) | ![](docs/img/iphone-dark-popup.png) |
-| Gemma 4 returns a 0–100 colour score, a stage (green → turning → near peak → peak → past), the colours it sees and a tree guess, in a couple of seconds. | “Red maples by the water” finds the lakeside sugar maples even though no one typed “water”: pgvector for meaning plus Postgres full-text for words. | Follows the system theme, with a manual toggle. Mobile gets a bottom sheet; wide screens get a side panel. |
+| Score a tree | Likes and leaderboard | Hybrid search | Dark mode |
+|---|---|---|---|
+| ![](docs/img/iphone-m05-result.png) | ![](docs/img/iphone-m08-leaders.png) | ![](docs/img/iphone-m09-search.png) | ![](docs/img/iphone-d06-popup.png) |
+| Camera first, any name on your first photo (no account). Gemma 4 returns a 0–100 colour score, a stage (green → turning → near peak → peak → past), the colours it sees and a tree guess, in a couple of seconds. | Like other walkers' trees; the board ranks walkers by photos, then likes. | “Red maples by the water” finds the lakeside sugar maples even though no one typed “water”: pgvector for meaning plus Postgres full-text for words. | Follows the system theme, with a manual toggle. Mobile gets a draggable bottom sheet; wide screens a side panel. Installable to the Home Screen. |
 
 ![Leaf Peep on desktop](docs/img/desktop-light-2-spot.jpg)
 
