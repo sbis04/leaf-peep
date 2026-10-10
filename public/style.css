@@ -410,3 +410,10 @@ body { background: transparent; }
 :root { --map-land: #f2f3f0; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --map-land: #1c1b1a; } }
 :root[data-theme="dark"] { --map-land: #1c1b1a; }
+
+/* iPhone Safari (not home-screen): Safari only shows page content under its translucent status bar when the page
+   is scrolled, so the app is made a little taller than the screen and pre-scrolled by that much. */
+html.ios-bleed, html.ios-bleed body { height: auto; overflow-x: hidden; }
+html.ios-bleed .app { position: absolute; top: 0; left: 0; right: 0; bottom: auto; height: calc(100lvh + var(--bleed)); }
+html.ios-bleed .pin-banner { top: calc(16px + var(--bleed)); }
+html.ios-bleed .leaflet-top { top: var(--bleed); }

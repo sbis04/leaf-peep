@@ -4,6 +4,7 @@ import sharp from 'sharp';
 import { timingSafeEqual } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { scorePhoto, stageFor } from './model.js';
+import { warmUp } from './embed.js';
 import { savePhoto, deletePhoto, photoUrl, localUploadsDir } from './storage.js';
 import {
   insertSighting, cellForecasts, searchCells, backfillEmbeddings, pool, migrate,
@@ -73,18 +74,26 @@ app.post('/api/sightings', scoreLimit, upload.single('photo'), async (req, res) 
     return res.status(400).json({ error: 'Pick a name first.', code: 'name_required' });
   }
 
-  // Re-encoding drops all metadata (EXIF, GPS) and shrinks the image for faster inference.
-  const jpeg = await sharp(req.file.buffer).rotate().resize(896, 896, { fit: 'inside' }).jpeg({ quality: 82 }).toBuffer();
-
-  const t0 = Date.now();
-  const verdict = await scorePhoto(jpeg);
-  const ms = Date.now() - t0;
+  // Re-encoding drops all metadata (EXIF, GPS). The model gets a small copy (fewer image tokens, faster reply);
+  // the map keeps a sharper one for people to look at.
+  const t = { start: Date.now() };
+  const base = sharp(req.file.buffer).rotate();
+  const [forModel, jpeg] = await Promise.all([
+    base.clone().resize(640, 640, { fit: 'inside' }).jpeg({ quality: 80 }).toBuffer(),
+    base.clone().resize(1024, 1024, { fit: 'inside' }).jpeg({ quality: 82 }).toBuffer(),
+  ]);
+  t.resized = Date.now();
+  const verdict = await scorePhoto(forModel);
+  t.scored = Date.now();
+  const ms = t.scored - t.resized;
   if (!verdict.isFoliage) {
     return res.status(422).json({ error: "Couldn't spot any leaves in that one. Point the camera at a tree and try again.", ms });
   }
 
   const { key, url } = await savePhoto(jpeg);
   const row = await insertSighting({ ...verdict, lat, lng, photoKey: key, walkerId });
+  t.saved = Date.now();
+  console.log(`score ${verdict.colorScore} · upload ${req.file.size >> 10} KB · resize ${t.resized - t.start} ms · model ${ms} ms · save+embed ${t.saved - t.scored} ms`);
   events.emit('change');
   res.json({ ...verdict, id: row.id, photo: url, ms });
 });
@@ -188,6 +197,7 @@ app.use((err, _req, res, _next) => {
 });
 
 await migrate();
+warmUp().then(() => console.log('embedding model ready')).catch(console.error); // avoid a slow first score
 backfillEmbeddings().then((n) => n && console.log(`embedded ${n} older sightings`)).catch(console.error);
 const port = Number(process.env.PORT ?? 8080);
 app.listen(port, () => console.log(`Leaf Peep on http://localhost:${port}`));

@@ -26,6 +26,18 @@ const COLOR_WORDS = {
 };
 const swatchFor = (w) => COLOR_WORDS[w.toLowerCase()] ?? COLOR_WORDS[w.toLowerCase().split(/\s|-/).pop()] ?? '#b9ad99';
 
+// ---------- iPhone Safari: let the map run under the status bar ----------
+const iosTab = /iPhone|iPod/.test(navigator.userAgent) && !navigator.standalone && !matchMedia('(display-mode: standalone)').matches;
+if (iosTab) {
+  const BLEED = 60;
+  document.documentElement.style.setProperty('--bleed', `${BLEED}px`);
+  document.documentElement.classList.add('ios-bleed');
+  const pin = () => { if (Math.abs(scrollY - BLEED) > 1) scrollTo(0, BLEED); };
+  addEventListener('load', () => setTimeout(pin, 50));
+  addEventListener('resize', pin);
+  addEventListener('scroll', () => { clearTimeout(pin.t); pin.t = setTimeout(pin, 250); }, { passive: true });
+}
+
 // ---------- anonymous walker ----------
 // A random id lives on this device; a name is asked for only before the first photo. No account, no email.
 const walker = (() => {
@@ -376,7 +388,7 @@ function pinOnMap() {
 }
 
 async function submit(file, where) {
-  const small = await downscale(file, 1280);
+  const small = await downscale(file, 1024);
   openResult(URL.createObjectURL(small));
   $('captureBtn').disabled = true;
   const body = new FormData();
