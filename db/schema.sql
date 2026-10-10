@@ -37,3 +37,11 @@ SELECT add_continuous_aggregate_policy('cell_daily',
   if_not_exists => TRUE);
 
 ALTER MATERIALIZED VIEW cell_daily SET (timescaledb.materialized_only = false);
+
+-- Search: hybrid keyword + vector over what Gemma saw in each photo.
+CREATE EXTENSION IF NOT EXISTS vector;
+ALTER TABLE sightings ADD COLUMN IF NOT EXISTS scene     TEXT;            -- Gemma's one-line description of trees + setting
+ALTER TABLE sightings ADD COLUMN IF NOT EXISTS embedding vector(384);     -- all-MiniLM-L6-v2 of trees/colours/scene/note
+ALTER TABLE sightings ADD COLUMN IF NOT EXISTS search    tsvector;        -- full-text of the same text
+CREATE INDEX IF NOT EXISTS sightings_embedding ON sightings USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS sightings_search ON sightings USING gin (search);

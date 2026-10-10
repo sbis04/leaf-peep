@@ -32,7 +32,7 @@ ollama pull gemma4
 
 # 2. TimescaleDB
 docker run -d --name leafpeep-db -p 5433:5432 \
-  -e POSTGRES_PASSWORD=leafpeep -e POSTGRES_DB=leafpeep timescale/timescaledb:latest-pg17
+  -e POSTGRES_PASSWORD=leafpeep -e POSTGRES_DB=leafpeep timescale/timescaledb-ha:pg17
 docker exec -i leafpeep-db psql -U postgres -d leafpeep < db/schema.sql
 # optional: synthetic history so the forecast has something to show (local only)
 docker exec -i leafpeep-db psql -U postgres -d leafpeep < db/dev-seed.sql

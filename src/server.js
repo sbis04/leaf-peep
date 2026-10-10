@@ -3,7 +3,7 @@ import multer from 'multer';
 import sharp from 'sharp';
 import { scorePhoto, stageFor } from './model.js';
 import { savePhoto, photoUrl, localUploadsDir } from './storage.js';
-import { insertSighting, cellForecasts, pool, migrate } from './db.js';
+import { insertSighting, cellForecasts, searchCells, backfillEmbeddings, pool, migrate } from './db.js';
 
 const app = express();
 const upload = multer({ limits: { fileSize: 15 * 1024 * 1024 } });
@@ -72,11 +72,29 @@ app.get('/api/cells', async (_req, res) => {
   })));
 });
 
+app.get('/api/search', async (req, res) => {
+  const q = String(req.query.q ?? '').trim().slice(0, 120);
+  if (!q) return res.json([]);
+  const rows = await searchCells(q);
+  res.json(rows.map((r) => ({
+    lat: r.cell_lat,
+    lng: r.cell_lng,
+    score: r.color_score,
+    stage: r.stage,
+    trees: r.trees,
+    scene: r.scene,
+    note: r.note,
+    photo: photoUrl(r.photo_key),
+    match: { vector: r.dist == null ? null : Number((1 - r.dist).toFixed(3)), keyword: r.kw_rank != null },
+  })));
+});
+
 app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).json({ error: 'Something went wrong scoring that photo. Try again in a moment.' });
 });
 
 await migrate();
+backfillEmbeddings().then((n) => n && console.log(`embedded ${n} older sightings`)).catch(console.error);
 const port = Number(process.env.PORT ?? 8080);
 app.listen(port, () => console.log(`Leaf Peep on http://localhost:${port}`));

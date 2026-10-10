@@ -26,7 +26,7 @@ services:
     depends_on: [db]
 
   db:
-    image: timescale/timescaledb:latest-pg17
+    image: timescale/timescaledb-ha:pg17   # includes pgvector + pgvectorscale
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: leafpeep

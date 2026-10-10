@@ -17,9 +17,10 @@ const SCHEMA = {
     color_score: { type: 'integer', minimum: 0, maximum: 100 },
     colors: { type: 'array', items: { type: 'string' }, maxItems: 4 },
     trees: { type: 'string' },
+    scene: { type: 'string' },
     note: { type: 'string' },
   },
-  required: ['is_foliage', 'stage', 'color_score', 'colors', 'trees', 'note'],
+  required: ['is_foliage', 'stage', 'color_score', 'colors', 'trees', 'scene', 'note'],
 };
 
 const PROMPT = `You are a fall foliage spotter. Look at the trees in this photo and judge how far along their autumn colour change is.
@@ -32,6 +33,7 @@ Estimate the share honestly; do not round up because the season is autumn.
 stage: green (<15), turning (15-50), near_peak (50-85), peak (85+), or past.
 colors: up to 4 plain colour words you actually see in the leaves.
 trees: your best guess of the tree types, or "unknown".
+scene: one plain, factual sentence describing the trees and their setting (e.g. "a row of tall maples along a lakeside path"), used for search.
 note: one short, friendly sentence a walker would enjoy, under 20 words. No emoji.
 is_foliage: false if the photo has no trees or leaves in it.
 
@@ -96,6 +98,7 @@ function normalize(r) {
     colorScore: score,
     colors: (Array.isArray(r.colors) ? r.colors : []).map(String).slice(0, 4),
     trees: String(r.trees ?? 'unknown').slice(0, 80),
+    scene: String(r.scene ?? '').slice(0, 200),
     note: String(r.note ?? '').slice(0, 160),
     model: MODEL,
   };

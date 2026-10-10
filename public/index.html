@@ -41,8 +41,14 @@
       <input id="photoInput" type="file" accept="image/*" capture="environment" hidden>
       <p class="hint" id="hint">Takes about ten seconds. Then back to the walk.</p>
 
+      <form class="find" id="findForm" role="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <input id="findInput" type="search" placeholder="Find red maples by the water…" aria-label="Search trees" autocomplete="off" enterkeyhint="search">
+        <button type="button" class="find-clear" id="findClear" aria-label="Clear search" hidden>×</button>
+      </form>
+
       <section class="nearby">
-        <h2>Worth the walk</h2>
+        <h2 id="listTitle">Worth the walk</h2>
         <ol class="spots" id="spots"><li class="empty">No trees scored yet around here. Be the first.</li></ol>
       </section>
 
@@ -63,7 +69,7 @@
 
   <dialog class="result" id="result">
     <div class="result-inner">
-      <div class="result-photo"><img id="resultImg" alt=""></div>
+      <div class="result-photo" id="resultPhoto"><img id="resultImg" alt=""><div class="scan" aria-hidden="true"></div></div>
       <div class="result-body">
         <div class="result-status" id="resultStatus">Reading the leaves…</div>
         <div class="score-row" id="scoreRow" hidden>
@@ -74,6 +80,7 @@
         <ul class="swatches" id="swatches"></ul>
         <p class="note" id="note"></p>
         <p class="trees" id="trees"></p>
+        <p class="byline" id="byline"></p>
         <button class="done" id="doneBtn" type="button">Back to the walk</button>
       </div>
     </div>

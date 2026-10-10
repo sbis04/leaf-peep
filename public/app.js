@@ -76,8 +76,11 @@ function locate() {
   });
 }
 
+let knownCells = null;
 async function loadCells({ fit = false } = {}) {
   cells = await fetch('/api/cells').then((r) => r.json());
+  const seen = knownCells;
+  knownCells = new Set(cells.map((c) => `${c.lat},${c.lng}`));
   layer.clearLayers();
   for (const c of cells) {
     const color = colorFor(c.score, c.stage);
@@ -85,7 +88,7 @@ async function loadCells({ fit = false } = {}) {
     const m = L.marker([c.lat, c.lng], {
       icon: L.divIcon({
         className: '',
-        html: `<div class="spot-marker ${c.forecast.kind === 'peak' ? 'peak' : ''}" style="width:${size}px;height:${size}px;background:${color}"></div>`,
+        html: `<div class="spot-marker ${c.forecast.kind === 'peak' ? 'peak' : ''} ${seen && !seen.has(`${c.lat},${c.lng}`) ? 'fresh' : ''}" style="width:${size}px;height:${size}px;background:${color}"></div>`,
         iconSize: [size, size],
       }),
     });
@@ -94,7 +97,7 @@ async function loadCells({ fit = false } = {}) {
     c.marker = m;
   }
   if (fit && cells.length && !me) map.fitBounds(L.latLngBounds(cells.map((c) => [c.lat, c.lng])).pad(0.3), { maxZoom: 14 });
-  renderList();
+  results ? showResults() : renderList();
 }
 
 function popupHtml(c, color) {
@@ -107,6 +110,61 @@ function popupHtml(c, color) {
       ${c.note ? `<p>${esc(c.note)}</p>` : ''}
       <p>${c.photos} photo${c.photos === 1 ? '' : 's'} · last ${ago}${c.trees && c.trees !== 'unknown' ? ` · ${esc(c.trees)}` : ''}</p>
     </div></div>`;
+}
+
+// ---------- search (hybrid keyword + vector, served from Tiger Data) ----------
+let results = null;
+$('findForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const q = $('findInput').value.trim();
+  if (!q) return clearSearch();
+  $('findInput').blur();
+  $('listTitle').textContent = 'Searching…';
+  const found = await fetch(`/api/search?q=${encodeURIComponent(q)}`).then((r) => r.json());
+  results = { q, found };
+  $('findClear').hidden = false;
+  showResults();
+};
+$('findClear').onclick = clearSearch;
+$('findInput').oninput = () => { $('findClear').hidden = !$('findInput').value; if (!$('findInput').value && results) clearSearch(); };
+
+function clearSearch() {
+  results = null;
+  $('findInput').value = '';
+  $('findClear').hidden = true;
+  for (const c of cells) c.marker?.getElement()?.firstElementChild?.classList.remove('dim');
+  renderList();
+}
+
+function showResults() {
+  const { q, found } = results;
+  const key = (c) => `${c.lat},${c.lng}`;
+  const hit = new Set(found.map(key));
+  for (const c of cells) c.marker?.getElement()?.firstElementChild?.classList.toggle('dim', !hit.has(key(c)));
+  $('listTitle').textContent = found.length ? `Matches for “${q}”` : `Nothing like “${q}” yet`;
+  const list = $('spots');
+  list.innerHTML = found.length ? '' : '<li class="empty">Try a tree, a colour or a place: “golden path”, “maples by a lake”.</li>';
+  for (const r of found) {
+    const c = cells.find((x) => key(x) === key(r));
+    const why = [r.match.keyword && 'words', r.match.vector != null && r.match.vector >= 0.38 && 'meaning'].filter(Boolean).join(' + ');
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="dot" style="background:${colorFor(r.score, r.stage)}"></span>
+      <span class="what">${esc(r.trees && r.trees !== 'unknown' ? r.trees : 'Trees')}<small>${esc(r.scene || r.note || '')}</small>
+      ${why ? `<span class="why">matched on ${why}</span>` : ''}</span>
+      <span class="num">${r.score}</span>`;
+    li.onclick = () => focusCell(c ?? r);
+    list.append(li);
+  }
+  if (found.length) {
+    const b = L.latLngBounds(found.map((r) => [r.lat, r.lng]));
+    found.length === 1 ? centerOn(found[0].lat, found[0].lng, 15, true) : map.flyToBounds(b.pad(0.4), { maxZoom: 15, duration: 0.8 });
+  }
+}
+
+function focusCell(c) {
+  if (innerWidth <= 820) $('panel').classList.add('collapsed');
+  setTimeout(() => centerOn(c.lat, c.lng, 15, true), innerWidth <= 820 ? 320 : 0);
+  if (c.marker) setTimeout(() => c.marker.openPopup(), 1200);
 }
 
 // Rank spots: peaking now first, then soonest to peak, nearest first within a group.
@@ -130,11 +188,7 @@ function renderList() {
     li.innerHTML = `<span class="dot" style="background:${colorFor(c.score, c.stage)}"></span>
       <span class="what">${esc(c.forecast.label)}<small>${esc((STAGE_LABEL[c.stage] ?? '') + tree + km)}</small></span>
       <span class="num">${c.score}</span>`;
-    li.onclick = () => {
-      if (innerWidth <= 820) $('panel').classList.add('collapsed');
-      setTimeout(() => centerOn(c.lat, c.lng, 15, true), innerWidth <= 820 ? 320 : 0);
-      setTimeout(() => c.marker.openPopup(), 1200);
-    };
+    li.onclick = () => focusCell(c);
     list.append(li);
   }
 }
@@ -227,6 +281,8 @@ function openResult(src) {
   if (src) $('resultImg').src = src; else $('resultImg').removeAttribute('src');
   $('resultStatus').className = 'result-status loading';
   $('resultStatus').textContent = 'Reading the leaves';
+  $('resultPhoto').classList.toggle('scanning', !!src);
+  $('byline').textContent = '';
   $('scoreRow').hidden = true;
   $('swatches').innerHTML = '';
   $('note').textContent = '';
@@ -238,6 +294,8 @@ function openResult(src) {
 
 function showVerdict(v) {
   const color = colorFor(v.colorScore, v.stage);
+  $('resultPhoto').classList.remove('scanning');
+  $('byline').textContent = `Scored by ${v.model.replace(/:latest$/, '')} · ${(v.ms / 1000).toFixed(1)} s`;
   $('resultStatus').className = 'result-status';
   $('resultStatus').textContent = 'Added to the map';
   $('scoreRow').hidden = false;
@@ -253,6 +311,7 @@ function showVerdict(v) {
 function showError(msg) {
   if (!$('result').open) openResult('');
   $('scoreRow').hidden = true;
+  $('resultPhoto').classList.remove('scanning');
   if (!$('resultImg').getAttribute('src')) $('resultImg').parentElement.hidden = true;
   $('resultStatus').className = 'result-status error';
   $('resultStatus').textContent = msg;
