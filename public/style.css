@@ -149,7 +149,7 @@ body {
 .foot a { color: var(--ink); }
 
 /* ---------- map ---------- */
-.map { height: 100%; width: 100%; background: var(--paper-2); }
+.map { position: relative; z-index: 1; height: 100%; width: 100%; background: var(--paper-2); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .leaflet-gl-layer { filter: var(--map-dark); }
 }

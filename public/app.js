@@ -36,19 +36,44 @@ L.maplibreGL({
 }).addTo(map);
 
 const layer = L.layerGroup().addTo(map);
+
+// On mobile the bottom sheet covers the lower part of the map; aim at the visible part instead.
+function centerOn(lat, lng, zoom, fly = false) {
+  const sheet = innerWidth <= 820 ? $('panel').offsetHeight : 0;
+  const target = map.project([lat, lng], zoom).add([0, sheet / 2]);
+  const ll = map.unproject(target, zoom);
+  fly ? map.flyTo(ll, zoom, { duration: 0.8 }) : map.setView(ll, zoom);
+}
 let me = null;
 let meMarker = null;
 let cells = [];
+let userMoved = false;
+map.on('dragstart zoomstart', (e) => { if (e.originalEvent || e.type === 'dragstart') userMoved = true; });
+
+// ?at=lat,lng stands in for the device location (demos, testing, privacy).
+const AT = (() => {
+  const m = new URLSearchParams(location.search).get('at')?.split(',').map(Number);
+  return m?.length === 2 && m.every(Number.isFinite) ? { lat: m[0], lng: m[1] } : null;
+})();
+function deviceLocation(opts) {
+  if (AT) return Promise.resolve(AT);
+  return new Promise((res) => {
+    if (!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(
+      (p) => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res(null), opts);
+  });
+}
 
 function locate() {
-  if (!navigator.geolocation) return;
-  navigator.geolocation.getCurrentPosition((p) => {
-    me = { lat: p.coords.latitude, lng: p.coords.longitude };
+  deviceLocation({ enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 }).then((loc) => {
+    if (!loc) return;
+    me = loc;
     meMarker?.remove();
     meMarker = L.marker([me.lat, me.lng], { icon: L.divIcon({ className: '', html: '<div class="me-marker"></div>', iconSize: [14, 14] }), interactive: false }).addTo(map);
-    if (!cells.length) map.setView([me.lat, me.lng], 13);
+    // Start where the user is; that's where they'll walk.
+    if (!userMoved) centerOn(me.lat, me.lng, 13);
     renderList();
-  }, () => {}, { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 });
+  });
 }
 
 async function loadCells({ fit = false } = {}) {
@@ -68,7 +93,7 @@ async function loadCells({ fit = false } = {}) {
     m.addTo(layer);
     c.marker = m;
   }
-  if (fit && cells.length) map.fitBounds(L.latLngBounds(cells.map((c) => [c.lat, c.lng])).pad(0.3), { maxZoom: 14 });
+  if (fit && cells.length && !me) map.fitBounds(L.latLngBounds(cells.map((c) => [c.lat, c.lng])).pad(0.3), { maxZoom: 14 });
   renderList();
 }
 
@@ -106,9 +131,9 @@ function renderList() {
       <span class="what">${esc(c.forecast.label)}<small>${esc((STAGE_LABEL[c.stage] ?? '') + tree + km)}</small></span>
       <span class="num">${c.score}</span>`;
     li.onclick = () => {
-      map.flyTo([c.lat, c.lng], 15, { duration: 0.8 });
-      setTimeout(() => c.marker.openPopup(), 850);
       if (innerWidth <= 820) $('panel').classList.add('collapsed');
+      setTimeout(() => centerOn(c.lat, c.lng, 15, true), innerWidth <= 820 ? 320 : 0);
+      setTimeout(() => c.marker.openPopup(), 1200);
     };
     list.append(li);
   }
@@ -139,16 +164,12 @@ $('photoInput').onchange = async (e) => {
 
 // Location priority: the photo's own GPS (great for uploading later), then the device, then a tap on the map.
 async function whereWasThis(file) {
+  if (AT) return AT; // an explicit override beats the photo's own GPS too
   try {
     const gps = await exifr.gps(file);
     if (gps && Number.isFinite(gps.latitude)) return { lat: gps.latitude, lng: gps.longitude };
   } catch { /* no EXIF */ }
-  const live = await new Promise((res) => {
-    if (!navigator.geolocation) return res(null);
-    navigator.geolocation.getCurrentPosition(
-      (p) => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      () => res(null), { enableHighAccuracy: true, timeout: 10000, maximumAge: 120000 });
-  });
+  const live = await deviceLocation({ enableHighAccuracy: true, timeout: 10000, maximumAge: 120000 });
   if (live) return live;
   return pinOnMap();
 }
@@ -181,7 +202,7 @@ async function submit(file, where) {
     showVerdict(data);
     await loadCells();
     const cell = cells.find((c) => Math.abs(c.lat - Math.round(where.lat * 100) / 100) < 1e-6 && Math.abs(c.lng - Math.round(where.lng * 100) / 100) < 1e-6);
-    map.flyTo([where.lat, where.lng], 14, { duration: 0.6 });
+    centerOn(where.lat, where.lng, 14, true);
     if (cell) $('doneBtn').onclick = () => { closeResult(); setTimeout(() => cell.marker.openPopup(), 400); };
   } catch (err) {
     showError(err.message);
