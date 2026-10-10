@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { readFile } from 'node:fs/promises';
 
 const url = process.env.DATABASE_URL ?? 'postgres://postgres:leafpeep@localhost:5433/leafpeep';
 export const pool = new pg.Pool({
@@ -6,6 +7,18 @@ export const pool = new pg.Pool({
   ssl: /sslmode=require|tsdb\.cloud/.test(url) ? { rejectUnauthorized: false } : undefined,
   max: 5,
 });
+
+// Idempotent: safe to run on every boot (local Timescale or Tiger Cloud).
+export async function migrate() {
+  const sql = await readFile(new URL('../db/schema.sql', import.meta.url), 'utf8');
+  for (let i = 1; ; i++) {
+    try { await pool.query(sql); return; } catch (err) {
+      if (i >= 15) throw err;
+      console.log(`database not ready (${err.code ?? err.message}), retrying…`);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+}
 
 // ~1.1 km grid. Coarsening happens before anything is written, so exact GPS is never stored.
 const CELL = 0.01;

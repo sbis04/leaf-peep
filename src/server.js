@@ -3,7 +3,7 @@ import multer from 'multer';
 import sharp from 'sharp';
 import { scorePhoto } from './model.js';
 import { savePhoto, photoUrl, localUploadsDir } from './storage.js';
-import { insertSighting, cellForecasts, pool } from './db.js';
+import { insertSighting, cellForecasts, pool, migrate } from './db.js';
 
 const app = express();
 const upload = multer({ limits: { fileSize: 15 * 1024 * 1024 } });
@@ -61,5 +61,6 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Something went wrong scoring that photo. Try again in a moment.' });
 });
 
+await migrate();
 const port = Number(process.env.PORT ?? 8080);
 app.listen(port, () => console.log(`Leaf Peep on http://localhost:${port}`));

@@ -1,4 +1,6 @@
-# Runs Leaf Peep on a single DigitalOcean Droplet: HTTPS proxy, the app, and the open model.
+# Runs Leaf Peep on a single DigitalOcean Droplet: HTTPS proxy, the app, the open model, and TimescaleDB.
+# Set DATABASE_URL in ../.env to use Tiger Cloud instead of the bundled TimescaleDB,
+# and SPACES_* to store photos in DigitalOcean Spaces instead of the uploads volume.
 services:
   caddy:
     image: caddy:2
@@ -8,7 +10,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
     environment:
-      SITE: ${SITE}
+      SITE: ${SITE:?set SITE in .env}
     depends_on: [app]
 
   app:
@@ -18,7 +20,18 @@ services:
     environment:
       MODEL_API: ollama
       MODEL_URL: http://ollama:11434
-    depends_on: [ollama]
+      DATABASE_URL: ${DATABASE_URL:-postgres://postgres:leafpeep@db:5432/leafpeep}
+    volumes:
+      - uploads:/app/uploads
+    depends_on: [ollama, db]
+
+  db:
+    image: timescale/timescaledb:latest-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: leafpeep
+      POSTGRES_DB: leafpeep
+    volumes: [pgdata:/var/lib/postgresql/data]
 
   ollama:
     image: ollama/ollama:latest
@@ -26,12 +39,13 @@ services:
     volumes: [ollama:/root/.ollama]
     environment:
       OLLAMA_KEEP_ALIVE: 24h
-    # Uncomment on a GPU Droplet (needs the NVIDIA container toolkit, preinstalled on DO's AI/ML images)
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
+    deploy:
+      resources:
+        reservations:
+          devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
 
 volumes:
   caddy_data:
+  uploads:
+  pgdata:
   ollama:
