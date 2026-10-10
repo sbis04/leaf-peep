@@ -337,6 +337,16 @@ async function openCamera() {
     $('camera').classList.remove('nocam');
     $('camera').showModal();
   } catch {
+    // Local development only: the iOS Simulator has no camera, so play the demo viewfinder clip instead.
+    if (/^(127\.0\.0\.1|localhost)$/.test(location.hostname)) {
+      const v = $('cameraVideo');
+      v.src = '/demo/viewfinder.mp4';
+      v.loop = true;
+      $('camera').classList.remove('nocam');
+      $('camera').showModal();
+      v.play().catch(() => {});
+      return;
+    }
     // No live camera (denied, simulator, old browser). Browsers only open the file picker from a direct tap,
     // so show the camera sheet with its Upload button instead of trying to open the picker from code.
     $('camera').classList.add('nocam');
@@ -348,7 +358,7 @@ function closeCamera() {
   stream?.getTracks().forEach((t) => t.stop());
   stream = null;
   $('cameraVideo').srcObject = null;
-  if (FAKECAM) { $('cameraVideo').pause(); $('cameraVideo').removeAttribute('src'); }
+  if ($('cameraVideo').getAttribute('src')) { $('cameraVideo').pause(); $('cameraVideo').removeAttribute('src'); }
   if ($('camera').open) $('camera').close();
 }
 $('cameraClose').onclick = closeCamera;
