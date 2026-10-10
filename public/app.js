@@ -233,6 +233,7 @@ function openResult(src) {
   $('trees').textContent = '';
   $('doneBtn').onclick = closeResult;
   $('result').showModal();
+  $('doneBtn').blur(); // showModal focuses the first button; don't paint a focus ring on open
 }
 
 function showVerdict(v) {

@@ -1,5 +1,7 @@
 # Leaf Peep
 
+![Leaf Peep on desktop](docs/screenshots/desktop-light-2-spot.png)
+
 **Where the colour is, this week.**
 
 Snap a tree on your walk. An open-weight vision model (Gemma 4) reads how far its leaves have turned, and the photo lands on a shared map of where fall foliage is peaking. A Tiger Data hypertable keeps the colour history for each spot and forecasts when it will peak, so the next person knows where to walk this weekend.
@@ -9,9 +11,9 @@ Ten seconds on the screen, then back outside.
 ## How it works
 
 ```
-phone camera ──► Express API ──► Gemma 4 (Ollama, on a DigitalOcean GPU Droplet)
+phone camera ──► Express API ──► Gemma 4 (DigitalOcean serverless inference, or Ollama locally)
                       │                 └─ returns stage, colour score 0–100, colours, tree guess
-                      ├─► DigitalOcean Spaces   (photo, re-encoded so no EXIF/GPS survives)
+                      ├─► photo storage         (Droplet volume or Spaces; re-encoded so no EXIF/GPS survives)
                       └─► Tiger Data / TimescaleDB
                               sightings      hypertable, location rounded to a ~1 km cell
                               cell_daily     continuous aggregate: daily colour per cell
@@ -44,20 +46,19 @@ Photos are saved to `./uploads` unless `SPACES_BUCKET` is set.
 
 ## Deploy on DigitalOcean
 
-One Droplet runs Caddy (automatic HTTPS), the app and Ollama. Photos go to Spaces and data to Tiger Cloud.
+A $12/month Droplet runs Caddy (automatic HTTPS), the app and TimescaleDB. Scoring calls **Gemma 4 on DigitalOcean serverless inference**, so no GPU is needed and you pay per photo (well under a tenth of a cent each).
 
 ```bash
-cp .env.example .env            # fill in DATABASE_URL, SPACES_*, SITE
-psql "$DATABASE_URL" -f db/schema.sql
-cd deploy && docker compose up -d --build
-docker compose exec ollama ollama pull gemma4
+cp .env.example .env     # set MODEL_KEY (a Model Access Key limited to Gemma 4)
+./deploy/up.sh           # creates the Droplet, deploys, prints https://<ip>.sslip.io
+./deploy/down.sh         # destroys it so billing stops
 ```
 
-On a GPU Droplet, uncomment the `deploy.resources` block in `deploy/docker-compose.yml`.
+To use Tiger Cloud instead of the bundled TimescaleDB, set `DATABASE_URL`. To keep photos in Spaces, set `SPACES_*`. To self-host the model on a GPU Droplet, set `MODEL_API=ollama` and run compose with `--profile ollama`.
 
 ## Stack
 
-Gemma 4 · Ollama · DigitalOcean (GPU Droplet, Spaces) · Tiger Data (TimescaleDB) · Node + Express · Leaflet + MapLibre with OpenFreeMap tiles
+Gemma 4 · DigitalOcean (serverless inference, Droplet) · Ollama for local dev · Tiger Data (TimescaleDB) · Node + Express · Leaflet + MapLibre with OpenFreeMap tiles
 
 ## License
 
