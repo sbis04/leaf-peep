@@ -636,6 +636,18 @@ function setSheet(state) {
   setSheet('half');
 })();
 map.on('dragstart', () => mobile() && setSheet('peek'));
+// opening a spot's popup tucks the sheet away so the dot and its popup are both visible
+map.on('popupopen', (e) => {
+  if (!mobile() || sheet === 'peek') return;
+  setSheet('peek');
+  const ll = e.popup.getLatLng();
+  setTimeout(() => {
+    // put the dot low enough that the whole popup fits below the status bar
+    const y = map.latLngToContainerPoint(ll).y;
+    const want = Math.min(innerHeight - 230, 470);
+    map.panBy([0, y - want], { duration: 0.35 });
+  }, 340);
+});
 
 loadCells({ fit: true }).catch(() => {});
 loadLeaders();
