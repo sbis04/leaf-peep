@@ -81,6 +81,12 @@ function askName() {
       }
     };
     dlg.showModal();
+    // iOS slides the page up when the keyboard opens; keep the sheet pinned to the visible area.
+    const vv = window.visualViewport;
+    const follow = () => { dlg.style.transform = vv ? `translateY(${vv.offsetTop}px)` : ''; };
+    vv?.addEventListener('resize', follow);
+    vv?.addEventListener('scroll', follow);
+    dlg.addEventListener('close', () => { vv?.removeEventListener('resize', follow); vv?.removeEventListener('scroll', follow); dlg.style.transform = ''; }, { once: true });
     setTimeout(() => $('nameInput').focus(), 50);
   });
 }
