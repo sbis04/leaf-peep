@@ -1,0 +1,24 @@
+# Render Blueprint: free web service, Gemma 4 via Google AI Studio, data in Tiger Cloud.
+# Render dashboard → New → Blueprint → pick this repo, then fill in the two secrets it asks for.
+services:
+  - type: web
+    name: leaf-peep
+    runtime: docker
+    plan: free
+    region: virginia
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL        # Tiger Cloud connection string
+        sync: false
+      - key: MODEL_KEY           # Google AI Studio API key
+        sync: false
+      - key: MODEL_API
+        value: openai
+      - key: MODEL_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai
+      - key: MODEL_NAME
+        value: GEMMA_MODEL_PLACEHOLDER
+      - key: MODEL_JSON_MODE
+        value: "false"
+      - key: TRUST_PROXY
+        value: "1"

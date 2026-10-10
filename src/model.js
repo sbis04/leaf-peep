@@ -72,6 +72,8 @@ async function viaOpenAI(b64) {
       temperature: 0.2,
       // Some providers (e.g. Google's Gemma endpoint) reject JSON mode; the reply is parsed either way.
       ...(process.env.MODEL_JSON_MODE !== 'false' && { response_format: { type: 'json_object' } }),
+      // e.g. MODEL_REASONING=none skips the model's thinking step where the provider supports it (faster replies)
+      ...(process.env.MODEL_REASONING && { reasoning_effort: process.env.MODEL_REASONING }),
       messages: [{
         role: 'user',
         content: [
@@ -86,6 +88,8 @@ async function viaOpenAI(b64) {
 }
 
 function extractJson(text) {
+  // Some providers inline the model's reasoning as <thought>…</thought>; only the answer matters.
+  text = String(text).replace(/<thought>[\s\S]*?<\/thought>/g, '');
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start < 0 || end < start) throw new Error(`model returned no JSON: ${text.slice(0, 200)}`);

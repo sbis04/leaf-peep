@@ -2,6 +2,7 @@
 # Creates (or reuses) the leaf-peep Droplet and deploys the app to it.
 #   ./deploy/up.sh            Gemma 4 on DigitalOcean serverless inference ($12/mo Droplet, needs MODEL_KEY)
 #   MODE=cpu ./deploy/up.sh   Gemma 4 e2b via Ollama on the Droplet's CPU ($48/mo Droplet, no inference API needed)
+#   MODE=gemini ./deploy/up.sh  Gemma 4 31B via Google AI Studio (GEMINI_API_KEY in .env), $12/mo Droplet
 # Needs: doctl (authenticated), ~/.ssh/leafpeep_ed25519, and ../.env. Billing runs until deploy/down.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -12,7 +13,11 @@ if [[ $MODE == cpu ]]; then REGION=${REGION:-nyc3} SIZE=${SIZE:-s-4vcpu-8gb} CPU
 else REGION=${REGION:-tor1} SIZE=${SIZE:-s-1vcpu-2gb}; fi
 SSH="ssh -i $KEY -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
 
-[[ $MODE == cpu ]] || grep -q '^MODEL_KEY=.\+' .env || { echo "Set MODEL_KEY in .env first (or use MODE=cpu)"; exit 1; }
+case $MODE in
+  cpu) ;;
+  gemini) grep -q '^GEMINI_API_KEY=.\+' .env || { echo "Set GEMINI_API_KEY in .env first"; exit 1; } ;;
+  *) grep -q '^MODEL_KEY=.\+' .env || { echo "Set MODEL_KEY in .env first (or use MODE=cpu / MODE=gemini)"; exit 1; } ;;
+esac
 
 IP=$(doctl compute droplet list --tag-name "$NAME" --format PublicIPv4 --no-header | head -1)
 if [[ -z "$IP" ]]; then
@@ -31,6 +36,9 @@ until $SSH root@"$IP" 'test -f /root/cloud-init-done && docker --version' >/dev/
 rsync -az --delete -e "$SSH" --exclude node_modules --exclude uploads --exclude .git --exclude .drafts --exclude docs ./ root@"$IP":/opt/leaf-peep/
 REMOTE_ENV="sed -i 's|^SITE=.*|SITE=$IP.sslip.io|' .env"
 PROFILE=""
+if [[ $MODE == gemini ]]; then
+  REMOTE_ENV+=" && GK=\$(grep '^GEMINI_API_KEY=' .env | cut -d= -f2-) && sed -i -e 's|^MODEL_API=.*|MODEL_API=openai|' -e 's|^MODEL_URL=.*|MODEL_URL=https://generativelanguage.googleapis.com/v1beta/openai|' -e 's|^MODEL_NAME=.*|MODEL_NAME=gemma-4-31b-it|' -e \"s|^MODEL_KEY=.*|MODEL_KEY=\$GK|\" .env && grep -q '^MODEL_JSON_MODE=' .env || echo MODEL_JSON_MODE=false >> .env"
+fi
 if [[ $MODE == cpu ]]; then
   REMOTE_ENV+=" && sed -i -e 's|^MODEL_API=.*|MODEL_API=ollama|' -e 's|^MODEL_URL=.*|MODEL_URL=http://ollama:11434|' -e 's|^MODEL_NAME=.*|MODEL_NAME=$CPU_MODEL|' .env"
   PROFILE="--profile ollama"
