@@ -16,8 +16,23 @@ app.get('/healthz', async (_req, res) => {
   res.json({ ok: true });
 });
 
+// Every score costs a model call, so cap each visitor (a walker needs a handful an hour, not hundreds).
+const LIMIT = Number(process.env.SCORES_PER_HOUR ?? 30);
+const hits = new Map();
+function rateLimit(req, res, next) {
+  const now = Date.now();
+  const recent = (hits.get(req.ip) ?? []).filter((t) => now - t < 3600_000);
+  if (recent.length >= LIMIT) {
+    return res.status(429).json({ error: "That's a lot of trees for one hour. Enjoy the walk and try again later." });
+  }
+  recent.push(now);
+  hits.set(req.ip, recent);
+  next();
+}
+app.set('trust proxy', 'loopback, uniquelocal');
+
 // Score one photo, store it, return the verdict.
-app.post('/api/sightings', upload.single('photo'), async (req, res) => {
+app.post('/api/sightings', rateLimit, upload.single('photo'), async (req, res) => {
   const lat = Number(req.body.lat);
   const lng = Number(req.body.lng);
   if (!req.file) return res.status(400).json({ error: 'No photo attached.' });
