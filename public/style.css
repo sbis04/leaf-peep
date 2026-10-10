@@ -271,16 +271,21 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   .map { grid-area: 1 / 1; }
   .panel {
     grid-area: 1 / 1; align-self: end;
-    max-height: 58vh;
+    height: var(--sheet-h, 52dvh); max-height: none;
+    overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
     gap: 18px;
     padding: 10px 16px calc(18px + env(safe-area-inset-bottom));
     border-right: 0;
     border-radius: 24px 24px 0 0;
     box-shadow: 0 -10px 40px -10px rgba(0,0,0,.25);
-    transition: max-height .3s ease;
+    transition: height .32s cubic-bezier(.2, .8, .2, 1);
   }
-  .panel.collapsed { max-height: 200px; overflow: hidden; }
-  .grip { display: block; width: 40px; height: 5px; border-radius: 99px; background: var(--rule); margin: 0 auto 2px; flex: none; cursor: pointer; }
+  .panel.dragging { transition: none; }
+  .panel.collapsed { overflow: hidden; }
+  /* the grip and the brand row are the drag handle; a tall invisible hit area makes it easy to grab */
+  .grip { display: block; position: relative; width: 44px; height: 5px; border-radius: 99px; background: var(--rule); margin: 2px auto 0; flex: none; cursor: grab; touch-action: none; }
+  .grip::after { content: ''; position: absolute; left: -45vw; right: -45vw; top: -16px; bottom: -14px; }
+  .brand { touch-action: none; }
   .brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
   .brand h1 { font-size: 34px; }
   .tagline { margin: 0; font-size: 10.5px; max-width: 16ch; text-align: right; line-height: 1.35; }
@@ -391,8 +396,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .namer-actions .ghost { border: 1px solid var(--rule); background: transparent; color: var(--ink); }
 .namer-actions .solid { border: 0; background: var(--ink); color: var(--paper); }
 @media (max-width: 820px) {
-  .namer { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 24px 24px 0 0; }
-  .namer form { padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+  /* anchored at the top so the keyboard never covers it */
+  .namer { width: calc(100vw - 24px); max-width: none; margin: calc(12px + env(safe-area-inset-top)) auto auto; border-radius: 24px; }
 }
 
 /* Safari tints its top strip from the page background: match the map's land colour so it reads as map. */
@@ -414,6 +419,16 @@ body { background: transparent; }
 /* iPhone Safari (not home-screen): Safari only shows page content under its translucent status bar when the page
    is scrolled, so the app is made a little taller than the screen and pre-scrolled by that much. */
 html.ios-bleed, html.ios-bleed body { height: auto; overflow-x: hidden; }
-html.ios-bleed .app { position: absolute; top: 0; left: 0; right: 0; bottom: auto; height: calc(100lvh + var(--bleed)); }
+html.ios-bleed .app { position: absolute; top: 0; left: 0; right: 0; bottom: auto; height: calc(100lvh + var(--bleed) + var(--bleed-bottom, 0px)); }
+/* the sheet runs on under Safari's bottom toolbar and home indicator; its content stays scrollable clear of them */
+html.ios-bleed .panel { padding-bottom: calc(18px + var(--bleed-bottom, 0px) + env(safe-area-inset-bottom)); }
+html.ios-bleed { background: var(--paper); }
 html.ios-bleed .pin-banner { top: calc(16px + var(--bleed)); }
 html.ios-bleed .leaflet-top { top: var(--bleed); }
+
+html.ios-bleed { overscroll-behavior-y: none; }
+
+.camera-none { display: none; position: absolute; left: 24px; right: 24px; top: 42%; margin: 0; text-align: center; font: 500 17px/1.45 var(--sans); color: #fff; }
+.camera.nocam .camera-none { display: block; }
+.camera.nocam .camera-frame, .camera.nocam .shutter { opacity: .25; pointer-events: none; }
+.camera.nocam .cam-upload { background: #fff; color: #111; }

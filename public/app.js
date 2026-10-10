@@ -30,12 +30,33 @@ const swatchFor = (w) => COLOR_WORDS[w.toLowerCase()] ?? COLOR_WORDS[w.toLowerCa
 const iosTab = /iPhone|iPod/.test(navigator.userAgent) && !navigator.standalone && !matchMedia('(display-mode: standalone)').matches;
 if (iosTab) {
   const BLEED = 60;
+  window.BLEED_BOTTOM = 90;
+  history.scrollRestoration = 'manual';
   document.documentElement.style.setProperty('--bleed', `${BLEED}px`);
+  document.documentElement.style.setProperty('--bleed-bottom', `${window.BLEED_BOTTOM}px`);
   document.documentElement.classList.add('ios-bleed');
+  // Safari resets the scroll on load, after the keyboard, after dialogs and when the tab returns; re-apply each time.
   const pin = () => { if (Math.abs(scrollY - BLEED) > 1) scrollTo(0, BLEED); };
-  addEventListener('load', () => setTimeout(pin, 50));
+  window.pinBleed = pin;
+  for (const ms of [0, 60, 200, 500, 1000, 2000, 3500]) setTimeout(pin, ms);
+  addEventListener('load', () => { pin(); setTimeout(pin, 300); });
+  addEventListener('pageshow', pin);
   addEventListener('resize', pin);
-  addEventListener('scroll', () => { clearTimeout(pin.t); pin.t = setTimeout(pin, 250); }, { passive: true });
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && setTimeout(pin, 100));
+  document.addEventListener('focusout', () => setTimeout(pin, 350)); // keyboard closed
+  document.addEventListener('close', () => setTimeout(pin, 50), true); // any <dialog> closed
+  addEventListener('scroll', () => { clearTimeout(pin.t); pin.t = setTimeout(pin, 200); }, { passive: true });
+}
+
+if (new URLSearchParams(location.search).has('debug')) {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:8px;top:45%;z-index:99999;background:#000c;color:#0f0;font:12px monospace;padding:6px 8px;border-radius:8px;white-space:pre;pointer-events:none';
+  document.body.append(box);
+  const tick = () => {
+    box.textContent = `scrollY ${Math.round(scrollY)}  inner ${innerWidth}x${innerHeight}\nvv ${Math.round(visualViewport?.height ?? 0)} off ${Math.round(visualViewport?.offsetTop ?? 0)}\ndocH ${document.documentElement.scrollHeight}  bleed ${document.documentElement.classList.contains('ios-bleed')}\nua ${/iPhone/.test(navigator.userAgent)} standalone ${navigator.standalone}`;
+    requestAnimationFrame(tick);
+  };
+  tick();
 }
 
 // ---------- anonymous walker ----------
@@ -148,7 +169,7 @@ async function loadCells({ fit = false } = {}) {
         iconSize: [size, size],
       }),
     });
-    m.bindPopup(popupHtml(c, color), { maxWidth: 240, minWidth: 240 });
+    m.bindPopup(popupHtml(c, color), { maxWidth: 240, minWidth: 240, autoPanPaddingTopLeft: [12, 70], autoPanPaddingBottomRight: [12, 24] });
     m.addTo(layer);
     c.marker = m;
   }
@@ -259,7 +280,7 @@ function showResults() {
 }
 
 function focusCell(c) {
-  if (innerWidth <= 820) $('panel').classList.add('collapsed');
+  if (mobile()) setSheet('peek');
   setTimeout(() => centerOn(c.lat, c.lng, 15, true), innerWidth <= 820 ? 320 : 0);
   if (c.marker) setTimeout(() => c.marker.openPopup(), 1200);
 }
@@ -312,9 +333,13 @@ async function openCamera() {
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false,
     });
     $('cameraVideo').srcObject = stream;
+    $('camera').classList.remove('nocam');
     $('camera').showModal();
   } catch {
-    $('photoInput').click(); // no live camera (denied, desktop, old browser): fall back to the system picker
+    // No live camera (denied, simulator, old browser). Browsers only open the file picker from a direct tap,
+    // so show the camera sheet with its Upload button instead of trying to open the picker from code.
+    $('camera').classList.add('nocam');
+    $('camera').showModal();
   }
 }
 
@@ -378,7 +403,7 @@ function pinOnMap() {
   return new Promise((res) => {
     $('pinBanner').hidden = false;
     document.querySelector('.app').classList.add('pinning');
-    $('panel').classList.add('collapsed');
+    setSheet('peek');
     map.once('click', (e) => {
       $('pinBanner').hidden = true;
       document.querySelector('.app').classList.remove('pinning');
@@ -514,8 +539,64 @@ $('themeBtn').onclick = () => {
 systemDark.addEventListener('change', syncThemeBtn);
 syncThemeBtn();
 
-$('panel').querySelector('.grip').onclick = () => $('panel').classList.toggle('collapsed');
-map.on('dragstart', () => innerWidth <= 820 && $('panel').classList.add('collapsed'));
+// ---------- bottom sheet (phones): drag the grip or header between peek, half and full ----------
+const mobile = () => innerWidth <= 820;
+// heights are what's visible; on iPhone Safari the sheet also extends BLEED_BOTTOM under the toolbar
+const snaps = () => {
+  const extra = window.BLEED_BOTTOM ?? 0;
+  return { peek: 190 + extra, half: Math.round(innerHeight * 0.52) + extra, full: Math.round(innerHeight * 0.88) + extra };
+};
+let sheet = 'half';
+function setSheet(state) {
+  if (!mobile()) return;
+  sheet = state;
+  const panel = $('panel');
+  panel.style.setProperty('--sheet-h', `${snaps()[state]}px`);
+  panel.classList.toggle('collapsed', state === 'peek');
+  if (state === 'peek') panel.scrollTop = 0;
+  window.pinBleed?.();
+}
+(() => {
+  const panel = $('panel');
+  let drag = null;
+  const start = (e) => {
+    if (!mobile() || e.target.closest('button, a, input')) return;
+    drag = { y: e.clientY, h: panel.getBoundingClientRect().height, t: performance.now(), lastY: e.clientY, lastT: performance.now(), moved: false };
+    panel.classList.add('dragging');
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const move = (e) => {
+    if (!drag) return;
+    const dy = e.clientY - drag.y;
+    if (Math.abs(dy) > 4) drag.moved = true;
+    const { peek, full } = snaps();
+    panel.style.setProperty('--sheet-h', `${Math.max(peek - 40, Math.min(full + 20, drag.h - dy))}px`);
+    drag.v = (e.clientY - drag.lastY) / Math.max(1, performance.now() - drag.lastT); // px per ms, + is downward
+    drag.lastY = e.clientY; drag.lastT = performance.now();
+  };
+  const end = () => {
+    if (!drag) return;
+    panel.classList.remove('dragging');
+    const h = panel.getBoundingClientRect().height;
+    const order = ['peek', 'half', 'full'];
+    let next;
+    if (!drag.moved) next = sheet === 'peek' ? 'half' : 'peek'; // a tap toggles
+    else if (Math.abs(drag.v ?? 0) > 0.45) next = order[Math.max(0, Math.min(2, order.indexOf(sheet) + (drag.v > 0 ? -1 : 1)))]; // flick
+    else next = order.reduce((a, k) => (Math.abs(snaps()[k] - h) < Math.abs(snaps()[a] - h) ? k : a), 'half');
+    drag = null;
+    setSheet(next);
+  };
+  for (const el of [panel.querySelector('.grip'), panel.querySelector('.brand')]) {
+    el.addEventListener('pointerdown', start);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+  }
+  addEventListener('resize', () => setSheet(sheet));
+  setSheet('half');
+})();
+map.on('dragstart', () => mobile() && setSheet('peek'));
+map.on('moveend', () => window.pinBleed?.());
 
 loadCells({ fit: true }).catch(() => {});
 loadLeaders();
