@@ -86,6 +86,6 @@ docs/             landing page, screenshots, demo video
 
 Gemma 4 (Google, open weights) · all-MiniLM-L6-v2 · demo narration by ElevenLabs (Eleven v3, voice “Eric”); an earlier cut used Kokoro, an open-weight TTS model (`docs/leaf-peep-demo.mp4`) · TimescaleDB, pgvector · OpenFreeMap, OpenMapTiles, OpenStreetMap contributors · Leaflet, MapLibre.
 
-The map history in the screenshots and demo video is demo data. Stock footage in the demo comes from Pexels: Ahmed (autumn walk by the lake), Maksim Goncharenok (man in park in autumn, man taking picture of lake) and Bofforss (capturing autumn foliage with smartphone).
+The map history in the screenshots and demo video is demo data. Stock footage in the demo comes from Pexels: Ahmed (autumn walk by the lake), Maksim Goncharenok (man in park, man taking picture of lake) and Bofforss (capturing autumn foliage with smartphone). Music: “Autumn Acoustic Guitar” by YuraSoop (Pixabay).
 
 MIT licensed.
