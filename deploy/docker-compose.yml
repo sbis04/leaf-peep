@@ -1,6 +1,6 @@
 # Runs Leaf Peep on a single DigitalOcean Droplet: HTTPS proxy, the app and TimescaleDB.
 # The model is Gemma 4 on DigitalOcean serverless inference (MODEL_* in ../.env).
-# To self-host it instead, set MODEL_API=ollama, MODEL_URL=http://ollama:11434 and run with --profile ollama on a GPU Droplet.
+# To self-host it instead, run `MODE=cpu ./deploy/up.sh` (Ollama on the Droplet's CPU). On a GPU Droplet also add -f docker-compose.gpu.yml.
 # Set DATABASE_URL in ../.env to use Tiger Cloud instead of the bundled TimescaleDB,
 # and SPACES_* to store photos in DigitalOcean Spaces instead of the uploads volume.
 services:
@@ -40,10 +40,6 @@ services:
     volumes: [ollama:/root/.ollama]
     environment:
       OLLAMA_KEEP_ALIVE: 24h
-    deploy:
-      resources:
-        reservations:
-          devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
 
 volumes:
   caddy_data:
