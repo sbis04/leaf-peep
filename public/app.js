@@ -231,6 +231,7 @@ $('findForm').onsubmit = async (e) => {
   const q = $('findInput').value.trim();
   if (!q) return clearSearch();
   $('findInput').blur();
+  scrollTo(0, 0);
   $('listTitle').textContent = 'Searching…';
   const found = await fetch(`/api/search?q=${encodeURIComponent(q)}`).then((r) => r.json());
   results = { q, found };
@@ -267,9 +268,13 @@ function showResults() {
     li.onclick = () => focusCell(c ?? r);
     list.append(li);
   }
+  map.closePopup();
   if (found.length) {
-    const b = L.latLngBounds(found.map((r) => [r.lat, r.lng]));
-    found.length === 1 ? centerOn(found[0].lat, found[0].lng, 15, true) : map.flyToBounds(b.pad(0.4), { maxZoom: 15, duration: 0.8 });
+    const b = L.latLngBounds(found.slice(0, 3).map((r) => [r.lat, r.lng]));
+    const sheetH = mobile() ? $('panel').offsetHeight : 0;
+    found.length === 1
+      ? centerOn(found[0].lat, found[0].lng, 15, true)
+      : map.flyToBounds(b, { maxZoom: 15, duration: 0.8, paddingTopLeft: [40, 60], paddingBottomRight: [40, sheetH + 40] });
   }
 }
 
@@ -548,6 +553,20 @@ $('themeBtn').onclick = () => {
 };
 systemDark.addEventListener('change', syncThemeBtn);
 syncThemeBtn();
+
+// iOS scrolls containers sideways to show a focused input; nothing here should ever be scrolled horizontally.
+(() => {
+  const fix = () => {
+    const panel = $('panel');
+    if (panel.scrollLeft) panel.scrollLeft = 0;
+    if (scrollX) scrollTo(0, scrollY);
+    for (const el of [document.documentElement, document.body, document.querySelector('.app')]) if (el.scrollLeft) el.scrollLeft = 0;
+  };
+  $('panel').addEventListener('scroll', fix, { passive: true });
+  addEventListener('scroll', fix, { passive: true });
+  document.addEventListener('focusin', () => { fix(); setTimeout(fix, 50); setTimeout(fix, 300); });
+  document.addEventListener('focusout', () => setTimeout(fix, 50));
+})();
 
 // ---------- bottom sheet (phones): drag the grip or header between peek, half and full ----------
 const mobile = () => innerWidth <= 820;

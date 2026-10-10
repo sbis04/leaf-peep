@@ -118,20 +118,20 @@ body {
 /* search */
 .find {
   display: flex; align-items: center; gap: 10px;
-  padding: 0 14px; height: 46px;
+  padding: 0 16px; height: 52px;
   border: 1px solid var(--rule); border-radius: 999px;
   background: var(--paper-2); color: var(--ink-2);
   transition: border-color .15s;
 }
 .find:focus-within { border-color: var(--ink-2); }
-.find svg { width: 18px; height: 18px; flex: none; }
+.find svg { width: 18px; height: 18px; flex: none; display: block; }
 .find input {
-  flex: 1; min-width: 0; border: 0; outline: 0; background: transparent;
-  font: 400 15px/1 var(--sans); color: var(--ink);
+  flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; outline: 0; background: transparent;
+  font: 400 16px/normal var(--sans); color: var(--ink); -webkit-appearance: none; appearance: none;
 }
 .find input::placeholder { color: var(--ink-2); opacity: .75; }
 .find input::-webkit-search-cancel-button { display: none; }
-.find-clear { border: 0; background: none; color: var(--ink-2); font-size: 22px; line-height: 1; cursor: pointer; padding: 0 2px; }
+.find-clear { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 50%; background: var(--paper); color: var(--ink-2); font-size: 18px; line-height: 1; cursor: pointer; padding: 0; }
 .spots .why { font: 400 11px/1.4 var(--mono); color: var(--ink-2); letter-spacing: .03em; }
 .spot-marker.dim { opacity: .22; filter: grayscale(.6); transition: opacity .2s; }
 
@@ -267,7 +267,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* ---------- mobile: map full-bleed, panel becomes a bottom sheet ---------- */
 @media (max-width: 820px) {
-  .app { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); width: 100%; overflow: hidden; }
+  .panel { min-width: 0; width: 100%; }
+  .find input { width: 0; }
   .map { grid-area: 1 / 1; }
   .panel {
     grid-area: 1 / 1; align-self: end;
@@ -454,3 +456,10 @@ body { background: transparent; }
   .panel:not(.full) { overflow-y: hidden; }
   .panel.full { overflow-y: auto; }
 }
+
+/* never let iOS scroll the page or sheet sideways (it does when focusing an input) */
+html, body { overflow: hidden; overscroll-behavior: none; }
+.panel { overflow-x: clip; }
+
+/* iOS zooms the page when a focused field's text is under 16px; keep every input at 16px or more */
+input, textarea, select { font-size: max(16px, 1em); }
