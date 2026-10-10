@@ -29,7 +29,9 @@ function rateLimit(req, res, next) {
   hits.set(req.ip, recent);
   next();
 }
-app.set('trust proxy', 'loopback, uniquelocal');
+// Behind a hosted proxy (Render, etc.) set TRUST_PROXY=1 so rate limiting sees the visitor's IP.
+const tp = process.env.TRUST_PROXY;
+app.set('trust proxy', tp ? (Number.isNaN(Number(tp)) ? tp : Number(tp)) : 'loopback, uniquelocal');
 
 // Score one photo, store it, return the verdict.
 app.post('/api/sightings', rateLimit, upload.single('photo'), async (req, res) => {

@@ -70,7 +70,8 @@ async function viaOpenAI(b64) {
     body: JSON.stringify({
       model: MODEL,
       temperature: 0.2,
-      response_format: { type: 'json_object' },
+      // Some providers (e.g. Google's Gemma endpoint) reject JSON mode; the reply is parsed either way.
+      ...(process.env.MODEL_JSON_MODE !== 'false' && { response_format: { type: 'json_object' } }),
       messages: [{
         role: 'user',
         content: [
