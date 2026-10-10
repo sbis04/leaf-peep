@@ -4,7 +4,7 @@
 
 ![Leaf Peep on iPhone: the map, a scored tree, and a forecast in dark mode](docs/img/iphone-hero.jpg)
 
-**[Landing page](https://sbis04.github.io/leaf-peep/)** · **[Demo video](docs/leaf-peep-demo.mp4)** · Built for the [Hacktoberfest 2026 Open-Source AI Challenge: Touch Grass](https://dev.to/challenges/hacktoberfest-week1-2026-10-05)
+**[Landing page](https://sbis04.github.io/leaf-peep/)** · **[Demo video](docs/leaf-peep-demo-v2.mp4)** · Built for the [Hacktoberfest 2026 Open-Source AI Challenge: Touch Grass](https://dev.to/challenges/hacktoberfest-week1-2026-10-05)
 
 ## What it does
 
@@ -84,8 +84,8 @@ docs/             landing page, screenshots, demo video
 
 ## Credits
 
-Gemma 4 (Google, open weights) · all-MiniLM-L6-v2 · Kokoro TTS for the demo voiceover · TimescaleDB, pgvector · OpenFreeMap, OpenMapTiles, OpenStreetMap contributors · Leaflet, MapLibre.
+Gemma 4 (Google, open weights) · all-MiniLM-L6-v2 · demo narration by ElevenLabs (Eleven v3, voice “Eric”); an earlier cut used Kokoro, an open-weight TTS model (`docs/leaf-peep-demo.mp4`) · TimescaleDB, pgvector · OpenFreeMap, OpenMapTiles, OpenStreetMap contributors · Leaflet, MapLibre.
 
-The map history in the screenshots and demo video is demo data.
+The map history in the screenshots and demo video is demo data. Stock footage in the demo comes from Pexels: Ahmed (autumn walk by the lake), Maksim Goncharenok (man in park in autumn, man taking picture of lake) and Bofforss (capturing autumn foliage with smartphone).
 
 MIT licensed.
