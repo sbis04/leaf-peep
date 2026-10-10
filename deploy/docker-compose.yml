@@ -13,6 +13,7 @@ services:
       - caddy_data:/data
     environment:
       SITE: ${SITE:?set SITE in .env}
+      ALT_SITE: ${ALT_SITE:-http://unused.invalid:81}
     depends_on: [app]
 
   app:

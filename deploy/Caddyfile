@@ -5,3 +5,8 @@
 	}
 	reverse_proxy app:8080
 }
+
+# The bare <ip>.sslip.io address keeps working by forwarding to the real domain.
+{$ALT_SITE} {
+	redir https://{$SITE}{uri} 308
+}

@@ -34,7 +34,10 @@ echo "Waiting for Docker…"
 until $SSH root@"$IP" 'test -f /root/cloud-init-done && docker --version' >/dev/null 2>&1; do sleep 10; done
 
 rsync -az --delete -e "$SSH" --exclude node_modules --exclude uploads --exclude .git --exclude .drafts --exclude docs ./ root@"$IP":/opt/leaf-peep/
-REMOTE_ENV="sed -i 's|^SITE=.*|SITE=$IP.sslip.io|' .env"
+# DOMAIN (e.g. leafpeep.example.com, an A record pointing at the Droplet) becomes the site; the sslip.io address redirects to it.
+DOMAIN=$(grep '^DOMAIN=' .env | cut -d= -f2- || true)
+if [[ -n "$DOMAIN" ]]; then SITE_HOST=$DOMAIN ALT_HOST=$IP.sslip.io; else SITE_HOST=$IP.sslip.io ALT_HOST=http://unused.invalid:81; fi
+REMOTE_ENV="sed -i -e '/^SITE=/d' -e '/^ALT_SITE=/d' .env && printf 'SITE=%s\\nALT_SITE=%s\\n' $SITE_HOST $ALT_HOST >> .env"
 PROFILE=""
 if [[ $MODE == gemini ]]; then
   REMOTE_ENV+=" && GK=\$(grep '^GEMINI_API_KEY=' .env | cut -d= -f2-) && sed -i -e 's|^MODEL_API=.*|MODEL_API=openai|' -e 's|^MODEL_URL=.*|MODEL_URL=https://generativelanguage.googleapis.com/v1beta/openai|' -e 's|^MODEL_NAME=.*|MODEL_NAME=gemma-4-31b-it|' -e \"s|^MODEL_KEY=.*|MODEL_KEY=\$GK|\" .env && grep -q '^MODEL_JSON_MODE=' .env || echo MODEL_JSON_MODE=false >> .env"
@@ -49,5 +52,5 @@ if [[ $MODE == cpu ]]; then
   $SSH root@"$IP" "cd /opt/leaf-peep/deploy && docker compose --env-file ../.env --profile ollama exec -T ollama ollama pull $CPU_MODEL"
 fi
 
-until curl -fsS "https://$IP.sslip.io/healthz" >/dev/null 2>&1; do sleep 5; done
-echo "Live: https://$IP.sslip.io"
+until curl -fsS "https://$SITE_HOST/healthz" >/dev/null 2>&1; do sleep 5; done
+echo "Live: https://$SITE_HOST"
