@@ -439,3 +439,18 @@ body { background: transparent; }
   html, body { height: var(--screen-h, 100lvh); background: var(--paper); }
   .app { bottom: auto; height: var(--screen-h, 100lvh); }
 }
+
+@media (max-width: 820px) {
+  /* pinned header: grip + brand stay at the top of the sheet while its content scrolls */
+  .panel { gap: 0; }
+  .panel > * + * { margin-top: 18px; }
+  .panel .grip, .panel .brand { position: sticky; z-index: 3; }
+  .panel .brand { background: var(--paper); }
+  .panel .grip { background: var(--rule); }
+  .panel .grip { top: 10px; margin: 10px auto 0; }
+  .panel { padding-top: 0 !important; }
+  .panel .brand { top: 0; padding: 30px 16px 10px; margin: -15px -16px 0; }
+  .panel .grip { z-index: 4; }
+  .panel:not(.full) { overflow-y: hidden; }
+  .panel.full { overflow-y: auto; }
+}

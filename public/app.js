@@ -560,44 +560,53 @@ function setSheet(state) {
   const panel = $('panel');
   panel.style.setProperty('--sheet-h', `${snaps()[state]}px`);
   panel.classList.toggle('collapsed', state === 'peek');
+  panel.classList.toggle('full', state === 'full');
   if (state === 'peek') panel.scrollTop = 0;
 }
+// Native-style sheet: a swipe on the sheet resizes it until it's full; when full, the content scrolls,
+// and pulling down from the top of the content shrinks it again. The header stays pinned so it can always be grabbed.
 (() => {
   const panel = $('panel');
-  let drag = null;
-  const start = (e) => {
-    if (!mobile() || e.target.closest('button, a, input')) return;
-    drag = { y: e.clientY, h: panel.getBoundingClientRect().height, t: performance.now(), lastY: e.clientY, lastT: performance.now(), moved: false };
-    panel.classList.add('dragging');
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-  const move = (e) => {
-    if (!drag) return;
-    const dy = e.clientY - drag.y;
-    if (Math.abs(dy) > 4) drag.moved = true;
+  const order = ['peek', 'half', 'full'];
+  let t = null;
+  panel.addEventListener('touchstart', (e) => {
+    if (!mobile() || e.touches.length !== 1) return;
+    const y = e.touches[0].clientY;
+    t = { y0: y, y, h: panel.getBoundingClientRect().height, time: performance.now(), mode: null,
+      header: Boolean(e.target.closest('.grip, .brand')) };
+  }, { passive: true });
+  panel.addEventListener('touchmove', (e) => {
+    if (!t) return;
+    const y = e.touches[0].clientY;
+    const dy = y - t.y0;
+    if (!t.mode) {
+      if (Math.abs(dy) < 6) return;
+      const atTop = panel.scrollTop <= 0;
+      t.mode = t.header || sheet !== 'full' || (atTop && dy > 0) ? 'sheet' : 'scroll';
+      if (t.mode === 'sheet') { panel.classList.add('dragging'); t.h = panel.getBoundingClientRect().height; t.y0 = y; }
+    }
+    if (t.mode !== 'sheet') return;
+    e.preventDefault();
     const { peek, full } = snaps();
-    panel.style.setProperty('--sheet-h', `${Math.max(peek - 40, Math.min(full + 20, drag.h - dy))}px`);
-    drag.v = (e.clientY - drag.lastY) / Math.max(1, performance.now() - drag.lastT); // px per ms, + is downward
-    drag.lastY = e.clientY; drag.lastT = performance.now();
-  };
+    panel.style.setProperty('--sheet-h', `${Math.max(peek - 40, Math.min(full + 20, t.h - (y - t.y0)))}px`);
+    t.v = (y - t.y) / Math.max(1, performance.now() - t.time);
+    t.y = y; t.time = performance.now();
+  }, { passive: false });
   const end = () => {
-    if (!drag) return;
+    if (!t) return;
+    const was = t; t = null;
+    if (was.mode !== 'sheet') return;
     panel.classList.remove('dragging');
     const h = panel.getBoundingClientRect().height;
-    const order = ['peek', 'half', 'full'];
     let next;
-    if (!drag.moved) next = sheet === 'peek' ? 'half' : 'peek'; // a tap toggles
-    else if (Math.abs(drag.v ?? 0) > 0.45) next = order[Math.max(0, Math.min(2, order.indexOf(sheet) + (drag.v > 0 ? -1 : 1)))]; // flick
+    if (Math.abs(was.v ?? 0) > 0.45) next = order[Math.max(0, Math.min(2, order.indexOf(sheet) + (was.v > 0 ? -1 : 1)))];
     else next = order.reduce((a, k) => (Math.abs(snaps()[k] - h) < Math.abs(snaps()[a] - h) ? k : a), 'half');
-    drag = null;
     setSheet(next);
   };
-  for (const el of [panel.querySelector('.grip'), panel.querySelector('.brand')]) {
-    el.addEventListener('pointerdown', start);
-    el.addEventListener('pointermove', move);
-    el.addEventListener('pointerup', end);
-    el.addEventListener('pointercancel', end);
-  }
+  panel.addEventListener('touchend', end);
+  panel.addEventListener('touchcancel', end);
+  // a plain tap on the grip toggles; desktop users get the same with a click
+  panel.querySelector('.grip').addEventListener('click', () => setSheet(sheet === 'peek' ? 'half' : 'peek'));
   addEventListener('resize', () => setSheet(sheet));
   setSheet('half');
 })();
