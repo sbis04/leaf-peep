@@ -4,7 +4,7 @@
 
 const API = process.env.MODEL_API ?? 'ollama';
 const BASE = process.env.MODEL_URL ?? 'http://localhost:11434';
-const MODEL = process.env.MODEL_NAME ?? 'gemma4:e2b';
+const MODEL = process.env.MODEL_NAME ?? 'gemma4:latest';
 const KEY = process.env.MODEL_KEY;
 
 export const STAGES = ['green', 'turning', 'near_peak', 'peak', 'past'];
@@ -24,7 +24,11 @@ const SCHEMA = {
 
 const PROMPT = `You are a fall foliage spotter. Look at the trees in this photo and judge how far along their autumn colour change is.
 
-color_score: 0 = fully green summer leaves, 50 = about half the canopy has turned, 85+ = peak (most leaves vivid red/orange/yellow), and use stage "past" when leaves are mostly brown or already fallen (score that by how much colour is left).
+color_score is the share of leaves that have changed from green to autumn colours (yellow, orange, red), from 0 to 100.
+Light green, yellow-green and bright sunlit green are still green: a canopy that is all shades of green scores 0-10.
+50 = about half the leaves have turned. 85+ = peak, almost every leaf is vivid yellow/orange/red.
+Use stage "past" when leaves are mostly brown, dull or already fallen (score that by how much colour is left).
+Estimate the share honestly; do not round up because the season is autumn.
 stage: green (<15), turning (15-50), near_peak (50-85), peak (85+), or past.
 colors: up to 4 plain colour words you actually see in the leaves.
 trees: your best guess of the tree types, or "unknown".
