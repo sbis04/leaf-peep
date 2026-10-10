@@ -436,5 +436,6 @@ body { background: transparent; }
 
 /* Home Screen web app (black-translucent): the layout viewport is shorter than the screen; fill all of it. */
 @media (display-mode: standalone) {
-  .app { bottom: auto; height: 100lvh; }
+  html, body { height: var(--screen-h, 100lvh); background: var(--paper); }
+  .app { bottom: auto; height: var(--screen-h, 100lvh); }
 }

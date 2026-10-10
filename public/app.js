@@ -543,6 +543,12 @@ syncThemeBtn();
 
 // ---------- bottom sheet (phones): drag the grip or header between peek, half and full ----------
 const mobile = () => innerWidth <= 820;
+// Home Screen app: iOS reports a viewport shorter than the screen; size the app to the physical screen.
+if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) {
+  const fit = () => document.documentElement.style.setProperty('--screen-h', `${Math.max(innerHeight, screen.height)}px`);
+  fit();
+  addEventListener('resize', fit);
+}
 const screenH = () => (matchMedia('(display-mode: standalone)').matches ? Math.max(innerHeight, screen.height) : innerHeight);
 const snaps = () => ({ peek: 190, half: Math.round(screenH() * 0.52), full: Math.round(screenH() * 0.88) });
 let sheet = 'half';
