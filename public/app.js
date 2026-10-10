@@ -543,7 +543,8 @@ syncThemeBtn();
 
 // ---------- bottom sheet (phones): drag the grip or header between peek, half and full ----------
 const mobile = () => innerWidth <= 820;
-const snaps = () => ({ peek: 190, half: Math.round(innerHeight * 0.52), full: Math.round(innerHeight * 0.88) });
+const screenH = () => (matchMedia('(display-mode: standalone)').matches ? Math.max(innerHeight, screen.height) : innerHeight);
+const snaps = () => ({ peek: 190, half: Math.round(screenH() * 0.52), full: Math.round(screenH() * 0.88) });
 let sheet = 'half';
 function setSheet(state) {
   if (!mobile()) return;
