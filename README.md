@@ -8,10 +8,11 @@
 
 ## What it does
 
-| Score a tree | Likes and leaderboard | Hybrid search | Dark mode |
-|---|---|---|---|
-| ![](docs/img/iphone-m05-result.png) | ![](docs/img/iphone-m08-leaders.png) | ![](docs/img/iphone-m09-search.png) | ![](docs/img/iphone-d06-popup.png) |
-| Camera first, any name on your first photo (no account). Gemma 4 returns a 0–100 colour score, a stage (green → turning → near peak → peak → past), the colours it sees and a tree guess, in a couple of seconds. | Like other walkers' trees; the board ranks walkers by photos, then likes. | “Red maples by the water” finds the lakeside sugar maples even though no one typed “water”: pgvector for meaning plus Postgres full-text for words. | Follows the system theme, with a manual toggle. Mobile gets a draggable bottom sheet; wide screens a side panel. Installable to the Home Screen. |
+<table>
+<tr><th width="25%">Score a tree</th><th width="25%">Likes and leaderboard</th><th width="25%">Hybrid search</th><th width="25%">Dark mode</th></tr>
+<tr><td width="25%" align="center"><img src="docs/img/iphone-m05-result.png" width="200" alt="Score a tree"></td><td width="25%" align="center"><img src="docs/img/iphone-m08-leaders.png" width="200" alt="Likes and leaderboard"></td><td width="25%" align="center"><img src="docs/img/iphone-m09-search.png" width="200" alt="Hybrid search"></td><td width="25%" align="center"><img src="docs/img/iphone-d06-popup.png" width="200" alt="Dark mode"></td></tr>
+<tr><td width="25%" valign="top">Camera first, any name on your first photo (no account). Gemma 4 returns a 0–100 colour score, a stage, the colours it sees and a tree guess.</td><td width="25%" valign="top">Like other walkers' trees; the board ranks walkers by photos, then likes.</td><td width="25%" valign="top">“Red maples by the water” finds lakeside maples: pgvector for meaning plus Postgres full-text for words.</td><td width="25%" valign="top">Follows the system theme. Draggable bottom sheet on phones, side panel on wide screens. Installable to the Home Screen.</td></tr>
+</table>
 
 ![Leaf Peep on desktop](docs/img/desktop-light-2-spot.jpg)
 
