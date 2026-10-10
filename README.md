@@ -66,7 +66,7 @@ cp .env.example .env        # set MODEL_KEY: a Model Access Key limited to Gemma
 ./deploy/down.sh            # destroys it so billing stops
 ```
 
-The Droplet runs Caddy (automatic HTTPS), the app and TimescaleDB via Docker Compose. Scoring uses Gemma 4 on DigitalOcean serverless inference, so no GPU is needed, at well under a tenth of a cent per photo. Set `DATABASE_URL` to use Tiger Cloud instead of the bundled database, `SPACES_*` to keep photos in Spaces, or `MODEL_API=ollama` with `--profile ollama` to self-host the model on a GPU Droplet.
+The Droplet runs Caddy (automatic HTTPS) and the app via Docker Compose, with data in **Tiger Cloud** (free tier; TLS is verified against Tiger's CA in `db/tiger-ca.pem`). Scoring uses Gemma 4 on DigitalOcean serverless inference, so no GPU is needed, at well under a tenth of a cent per photo. Leave `DATABASE_URL` unset to use the bundled TimescaleDB container instead, `SPACES_*` to keep photos in Spaces, or `MODEL_API=ollama` with `--profile ollama` to self-host the model on a GPU Droplet.
 
 ## Project layout
 

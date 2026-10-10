@@ -1,11 +1,15 @@
 import pg from 'pg';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { embed, toVector, docFor } from './embed.js';
 
 const url = process.env.DATABASE_URL ?? 'postgres://postgres:leafpeep@localhost:5433/leafpeep';
+const remote = /sslmode=|tsdb\.cloud/.test(url);
+// Tiger Cloud signs its certificates with its own CA (ca.timescale.com); verify against it rather than skipping checks.
+const ca = /tsdb\.cloud/.test(url) ? readFileSync(new URL('../db/tiger-ca.pem', import.meta.url), 'utf8') : undefined;
 export const pool = new pg.Pool({
-  connectionString: url,
-  ssl: /sslmode=require|tsdb\.cloud/.test(url) ? { rejectUnauthorized: false } : undefined,
+  connectionString: url.replace(/[?&]sslmode=[^&]*/, ''), // sslmode in the URL would override the ssl options below
+  ssl: remote ? { ca, rejectUnauthorized: true } : undefined,
   max: 5,
 });
 
