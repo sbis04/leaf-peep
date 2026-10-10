@@ -41,6 +41,27 @@ export async function insertSighting(s) {
   return rows[0];
 }
 
+// ---------- rate limits (persistent) ----------
+// Records a hit and returns how many hits the bucket has in the window, including this one.
+// Old rows are pruned opportunistically so the table stays small.
+export async function hit(bucket, windowSec) {
+  const { rows } = await pool.query(
+    `WITH ins AS (INSERT INTO rate_hits (bucket) VALUES ($1))
+     SELECT count(*)::int + 1 AS n FROM rate_hits WHERE bucket = $1 AND at > now() - make_interval(secs => $2)`,
+    [bucket, windowSec]);
+  if (Math.random() < 0.02) pool.query("DELETE FROM rate_hits WHERE at < now() - interval '2 days'").catch(() => {});
+  return rows[0].n;
+}
+export async function countHits(bucket, windowSec) {
+  const { rows } = await pool.query(
+    'SELECT count(*)::int AS n FROM rate_hits WHERE bucket = $1 AND at > now() - make_interval(secs => $2)', [bucket, windowSec]);
+  return rows[0].n;
+}
+export async function walkerHasPhoto(id) {
+  const { rows } = await pool.query('SELECT 1 FROM sightings WHERE walker_id = $1 LIMIT 1', [id]);
+  return rows.length > 0;
+}
+
 // ---------- walkers, likes, leaderboard ----------
 export async function upsertWalker(id, name) {
   const { rows } = await pool.query(

@@ -465,3 +465,11 @@ html, body { overflow: hidden; overscroll-behavior: none; }
 input, textarea, select { font-size: max(16px, 1em); }
 .like span:empty { display: none; }
 .like { justify-content: center; min-width: 44px; }
+
+.toast {
+  position: fixed; z-index: 1300; left: 50%; top: calc(14px + env(safe-area-inset-top)); transform: translateX(-50%);
+  max-width: min(420px, calc(100vw - 32px)); padding: 12px 16px; border-radius: 14px;
+  background: var(--ink); color: var(--paper); font: 500 14px/1.4 var(--sans); box-shadow: var(--shadow);
+  transition: opacity .4s, transform .4s;
+}
+.toast.out { opacity: 0; transform: translate(-50%, -8px); }

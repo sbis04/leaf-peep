@@ -66,3 +66,10 @@ CREATE TABLE IF NOT EXISTS likes (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (sighting_id, walker_id)
 );
+
+-- Rate limits and the daily scoring budget, kept in the database so restarts don't reset them.
+CREATE TABLE IF NOT EXISTS rate_hits (
+  bucket TEXT NOT NULL,          -- e.g. 'score:<ip>', 'like:<walker>', 'budget:score'
+  at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS rate_hits_bucket_at ON rate_hits (bucket, at DESC);

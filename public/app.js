@@ -40,6 +40,22 @@ if (iosTab && !/[?&](fakecam|demo|fresh)=?/.test(location.search)) {
   }
 }
 
+// ---------- pinch and ctrl+scroll zoom the map, never the page ----------
+// Trackpad pinches arrive as ctrl+wheel; Safari sends gesture events. Either one zooms the whole page
+// (and can hide the panel) unless it's stopped here.
+(() => {
+  const mapEl = document.getElementById('map');
+  document.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    if (!mapEl.contains(e.target)) {
+      // a pinch over the panel still zooms the map, around its centre
+      map.setZoom(map.getZoom() + (e.deltaY < 0 ? 0.25 : -0.25), { animate: false });
+    }
+  }, { passive: false });
+  for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+})();
+
 // ---------- anonymous walker ----------
 // A random id lives on this device; a name is asked for only before the first photo. No account, no email.
 const walker = (() => {
@@ -197,7 +213,7 @@ document.addEventListener('click', async (e) => {
   try {
     const res = await fetch('/api/likes', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sighting_id: btn.dataset.sighting, walker_id: walker.id }) });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    if (!res.ok) { toast(data.error || 'Could not like that one.'); throw new Error(data.error); }
     btn.classList.toggle('on', data.liked);
     btn.setAttribute('aria-pressed', data.liked);
     btn.querySelector('span').textContent = data.likes || '';
@@ -208,6 +224,15 @@ document.addEventListener('click', async (e) => {
     btn.disabled = false;
   }
 });
+
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.append(t);
+  setTimeout(() => t.classList.add('out'), 2800);
+  setTimeout(() => t.remove(), 3300);
+}
 
 // ---------- leaderboard ----------
 async function loadLeaders() {

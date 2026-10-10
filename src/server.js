@@ -5,10 +5,12 @@ import { timingSafeEqual } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { scorePhoto, stageFor } from './model.js';
 import { warmUp } from './embed.js';
+import { checkName, warmUpModeration } from './moderate.js';
 import { savePhoto, deletePhoto, photoUrl, localUploadsDir } from './storage.js';
 import {
   insertSighting, cellForecasts, searchCells, backfillEmbeddings, pool, migrate,
   upsertWalker, getWalker, toggleLike, leaderboard, deleteSighting, adminSummary,
+  hit, countHits, walkerHasPhoto,
 } from './db.js';
 
 const app = express();
@@ -28,20 +30,22 @@ app.get('/healthz', async (_req, res) => {
 const tp = process.env.TRUST_PROXY;
 app.set('trust proxy', tp ? (Number.isNaN(Number(tp)) ? tp : Number(tp)) : 'loopback, uniquelocal');
 
-// Every score costs a model call, so cap each visitor (a walker needs a handful an hour, not hundreds).
-function limiter(perHour, message) {
-  const hits = new Map();
-  return (req, res, next) => {
-    const now = Date.now();
-    const recent = (hits.get(req.ip) ?? []).filter((t) => now - t < 3600_000);
-    if (recent.length >= perHour) return res.status(429).json({ error: message });
-    recent.push(now);
-    hits.set(req.ip, recent);
-    next();
+// Limits live in the database (rate_hits) so a restart or redeploy doesn't reset them.
+function limiter(name, perHour, message) {
+  return async (req, res, next) => {
+    try {
+      if ((await hit(`${name}:${req.ip}`, 3600)) > perHour) return res.status(429).json({ error: message });
+      next();
+    } catch (err) { next(err); }
   };
 }
-const scoreLimit = limiter(Number(process.env.SCORES_PER_HOUR ?? 30), "That's a lot of trees for one hour. Enjoy the walk and try again later.");
-const likeLimit = limiter(300, 'Easy there. Try again in a bit.');
+const scoreLimit = limiter('score', Number(process.env.SCORES_PER_HOUR ?? 30), "That's a lot of trees for one hour. Enjoy the walk and try again later.");
+const likeLimit = limiter('like', 300, 'Easy there. Try again in a bit.');
+
+// Daily budget across everyone: every score is a paid model call, so the total per day is capped.
+const DAILY_SCORES = Number(process.env.DAILY_SCORE_BUDGET ?? 500);
+const LIKES_PER_WALKER_DAY = Number(process.env.LIKES_PER_WALKER_DAY ?? 100);
+const NEW_WALKERS_PER_DAY = Number(process.env.NEW_WALKERS_PER_DAY ?? 3);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isId = (v) => typeof v === 'string' && UUID.test(v);
@@ -53,11 +57,20 @@ function cleanName(raw) {
 }
 
 // ---------- walkers ----------
-app.post('/api/walkers', limiter(20, 'Too many name changes. Try again later.'), async (req, res) => {
+app.post('/api/walkers', limiter('walker', 20, 'Too many name changes. Try again later.'), async (req, res) => {
   const { id } = req.body ?? {};
   const name = cleanName(req.body?.name);
   if (!isId(id)) return res.status(400).json({ error: 'Bad walker id.' });
   if (!name) return res.status(400).json({ error: 'Pick a name between 1 and 32 characters.' });
+  const why = await checkName(name);
+  if (why) {
+    console.log(`name rejected (${why})`);
+    return res.status(422).json({ error: "Let's keep it friendly. Please pick a different name.", code: 'name_rejected' });
+  }
+  // A few new walkers per network per day, so scripts can't mint likers or flood the leaderboard.
+  if (!(await getWalker(id)) && (await hit(`newwalker:${req.ip}`, 86400)) > NEW_WALKERS_PER_DAY) {
+    return res.status(429).json({ error: 'Too many new names from here today. Try again tomorrow.' });
+  }
   res.json(await upsertWalker(id, name));
 });
 
@@ -78,6 +91,11 @@ app.post('/api/sightings', scoreLimit, upload.single('photo'), async (req, res) 
   if (!isId(walkerId) || !(await getWalker(walkerId))) {
     return res.status(400).json({ error: 'Pick a name first.', code: 'name_required' });
   }
+
+  if ((await countHits('budget:score', 86400)) >= DAILY_SCORES) {
+    return res.status(503).json({ error: "It's a busy day for Leaf Peep, so scoring is paused until tomorrow. The map, likes and search still work.", code: 'budget' });
+  }
+  await hit('budget:score', 86400);
 
   // Re-encoding drops all metadata (EXIF, GPS). The model gets a small copy (fewer image tokens, faster reply);
   // the map keeps a sharper one for people to look at.
@@ -129,6 +147,13 @@ app.get('/api/cells', async (req, res) => {
 app.post('/api/likes', likeLimit, async (req, res) => {
   const { sighting_id: sightingId, walker_id: walkerId } = req.body ?? {};
   if (!isId(sightingId) || !isId(walkerId)) return res.status(400).json({ error: 'Bad request.' });
+  // Only real walkers can like: a name and at least one scored photo. Stops scripts inventing likers.
+  if (!(await getWalker(walkerId)) || !(await walkerHasPhoto(walkerId))) {
+    return res.status(403).json({ error: 'Score a tree first, then you can like other walkers\' trees.', code: 'walker_required' });
+  }
+  if ((await hit(`likes:${walkerId}`, 86400)) > LIKES_PER_WALKER_DAY) {
+    return res.status(429).json({ error: 'That is a lot of likes for one day. Try again tomorrow.' });
+  }
   const result = await toggleLike(sightingId, walkerId);
   events.emit('change');
   res.json(result);
@@ -203,6 +228,7 @@ app.use((err, _req, res, _next) => {
 
 await migrate();
 warmUp().then(() => console.log('embedding model ready')).catch(console.error); // avoid a slow first score
+warmUpModeration().then(() => console.log('moderation model ready')).catch(console.error);
 backfillEmbeddings().then((n) => n && console.log(`embedded ${n} older sightings`)).catch(console.error);
 const port = Number(process.env.PORT ?? 8080);
 app.listen(port, () => console.log(`Leaf Peep on http://localhost:${port}`));
