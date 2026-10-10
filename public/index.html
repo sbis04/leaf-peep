@@ -5,8 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Leaf Peep</title>
   <meta name="description" content="Snap a tree on your walk. An open model scores its autumn colour and puts it on a shared map of where fall foliage is peaking.">
-  <meta name="theme-color" content="#f3ede2" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#14130f" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Leaf Peep">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/icon-180.png">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%23d9542b'/></svg>">
   <script>try{const t=new URLSearchParams(location.search).get("theme")||localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch{}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -39,6 +43,7 @@
         <span class="capture-label">Score a tree</span>
       </button>
       <input id="photoInput" type="file" accept="image/*" capture="environment" hidden>
+      <input id="libraryInput" type="file" accept="image/*" hidden>
       <p class="hint" id="hint">Point at one tree, not the whole view. Then back to the walk.</p>
 
       <form class="find" id="findForm" role="search">
@@ -50,6 +55,11 @@
       <section class="nearby">
         <h2 id="listTitle">Worth the walk</h2>
         <ol class="spots" id="spots"><li class="empty">No trees scored yet around here. Be the first.</li></ol>
+      </section>
+
+      <section class="board">
+        <h2>Top walkers</h2>
+        <ol class="leaders" id="leaders"><li class="empty">No walkers yet. Score a tree to get on the board.</li></ol>
       </section>
 
       <figure class="legend" aria-label="Colour scale">
@@ -66,6 +76,35 @@
     <div class="map" id="map" role="region" aria-label="Map of scored trees"></div>
     <div class="pin-banner" id="pinBanner" hidden>Tap the map where you took this photo</div>
   </main>
+
+  <dialog class="camera" id="camera" aria-label="Camera">
+    <video id="cameraVideo" playsinline muted autoplay></video>
+    <div class="camera-top">
+      <button class="cam-icon" id="cameraClose" type="button" aria-label="Close camera">✕</button>
+      <span class="camera-hint">Point at one tree</span>
+      <span class="cam-spacer"></span>
+    </div>
+    <div class="camera-frame" aria-hidden="true"></div>
+    <div class="camera-bar">
+      <button class="cam-upload" id="cameraUpload" type="button">Upload a photo</button>
+      <button class="shutter" id="shutter" type="button" aria-label="Take photo"><span></span></button>
+      <span class="cam-spacer"></span>
+    </div>
+  </dialog>
+
+  <dialog class="namer" id="namer">
+    <form method="dialog" id="namerForm">
+      <div class="label">One-time</div>
+      <h3>What should we call you?</h3>
+      <p>Any name you like. It shows on the leaderboard and on your photos. No account, no email. It stays on this phone.</p>
+      <input id="nameInput" maxlength="32" autocomplete="nickname" autocapitalize="words" enterkeyhint="done" placeholder="e.g. Leaf Lover" required>
+      <p class="namer-error" id="nameError" hidden></p>
+      <div class="namer-actions">
+        <button type="button" class="ghost" id="nameCancel">Not now</button>
+        <button type="submit" class="solid" id="nameSave">Continue</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog class="result" id="result">
     <div class="result-inner">

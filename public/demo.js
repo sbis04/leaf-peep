@@ -30,9 +30,10 @@ async function tapThen(el, ms = 350) {
   el.click();
 }
 
-export async function run({ mode, photoUrl, query, spot, submit, where }) {
+export async function run({ mode, photoUrl, query, spot, submit, where, ensureName }) {
   await sleep(3000);
   if (mode === 'score') {
+    await ensureName('Demo walker');
     tapOn($('captureBtn'));
     await sleep(500);
     const blob = await fetch(photoUrl).then((r) => r.blob());

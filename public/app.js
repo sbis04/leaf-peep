@@ -26,6 +26,50 @@ const COLOR_WORDS = {
 };
 const swatchFor = (w) => COLOR_WORDS[w.toLowerCase()] ?? COLOR_WORDS[w.toLowerCase().split(/\s|-/).pop()] ?? '#b9ad99';
 
+// ---------- anonymous walker ----------
+// A random id lives on this device; a name is asked for only before the first photo. No account, no email.
+const walker = (() => {
+  let w = null;
+  try { w = JSON.parse(localStorage.getItem('lp.walker') || 'null'); } catch { /* storage blocked */ }
+  if (!w?.id) w = { id: crypto.randomUUID(), name: null };
+  return w;
+})();
+function saveWalker() {
+  try { localStorage.setItem('lp.walker', JSON.stringify(walker)); } catch { /* private mode: keep it in memory */ }
+}
+saveWalker();
+
+function askName() {
+  return new Promise((resolve) => {
+    const dlg = $('namer');
+    $('nameInput').value = walker.name ?? '';
+    $('nameError').hidden = true;
+    const done = (v) => { dlg.close(); resolve(v); };
+    $('nameCancel').onclick = () => done(false);
+    $('namerForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const name = $('nameInput').value.replace(/\s+/g, ' ').trim();
+      if (!name) return;
+      $('nameSave').disabled = true;
+      try {
+        const res = await fetch('/api/walkers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: walker.id, name }) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not save that name.');
+        walker.name = data.name;
+        saveWalker();
+        done(true);
+      } catch (err) {
+        $('nameError').textContent = err.message;
+        $('nameError').hidden = false;
+      } finally {
+        $('nameSave').disabled = false;
+      }
+    };
+    dlg.showModal();
+    setTimeout(() => $('nameInput').focus(), 50);
+  });
+}
+
 // ---------- map ----------
 const map = L.map('map', { zoomControl: false, attributionControl: true }).setView([40.7812, -73.9665], 12);
 L.control.zoom({ position: 'topright' }).addTo(map);
@@ -78,7 +122,7 @@ function locate() {
 
 let knownCells = null;
 async function loadCells({ fit = false } = {}) {
-  cells = await fetch('/api/cells').then((r) => r.json());
+  cells = await fetch(`/api/cells?me=${walker.id}`).then((r) => r.json());
   const seen = knownCells;
   knownCells = new Set(cells.map((c) => `${c.lat},${c.lng}`));
   layer.clearLayers();
@@ -109,7 +153,48 @@ function popupHtml(c, color) {
         <span class="pop-fc">${esc(c.forecast.label)}</span></div>
       ${c.note ? `<p>${esc(c.note)}</p>` : ''}
       <p>${c.photos} photo${c.photos === 1 ? '' : 's'} · last ${ago}${c.trees && c.trees !== 'unknown' ? ` · ${esc(c.trees)}` : ''}</p>
+      <div class="pop-foot">
+        <span class="pop-by">${c.by ? `by ${esc(c.by)}` : ''}</span>
+        ${c.sighting ? `<button class="like ${c.liked ? 'on' : ''}" type="button" data-sighting="${c.sighting}" aria-pressed="${c.liked}" aria-label="Like this photo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 8 3.4 4.5 6.9 4.5c2 0 3.6 1.1 5.1 3 1.5-1.9 3.1-3 5.1-3 3.5 0 5.5 3.5 4.2 6.8-1.8 4.6-9.3 9.2-9.3 9.2Z"/></svg>
+          <span>${c.likes || ''}</span></button>` : ''}
+      </div>
     </div></div>`;
+}
+
+// ---------- likes ----------
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.like');
+  if (!btn) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/likes', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sighting_id: btn.dataset.sighting, walker_id: walker.id }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    btn.classList.toggle('on', data.liked);
+    btn.setAttribute('aria-pressed', data.liked);
+    btn.querySelector('span').textContent = data.likes || '';
+    const c = cells.find((x) => x.sighting === btn.dataset.sighting);
+    if (c) { c.liked = data.liked; c.likes = data.likes; c.marker.setPopupContent(popupHtml(c, colorFor(c.score, c.stage))); }
+    loadLeaders();
+  } catch { /* leave it as it was */ } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---------- leaderboard ----------
+async function loadLeaders() {
+  const rows = await fetch('/api/leaderboard').then((r) => r.json()).catch(() => []);
+  const list = $('leaders');
+  if (!rows.length) {
+    list.innerHTML = '<li class="empty">No walkers yet. Score a tree to get on the board.</li>';
+    return;
+  }
+  list.innerHTML = rows.map((r, i) => `<li class="${r.name === walker.name ? 'you' : ''}">
+    <span class="rank">${i + 1}</span>
+    <span class="who">${esc(r.name)}${r.name === walker.name ? ' <small>you</small>' : ''}</span>
+    <span class="stat"><b>${r.photos}</b> photo${r.photos === 1 ? '' : 's'}</span>
+    <span class="stat heart">♥ ${r.likes}</span></li>`).join('');
 }
 
 // ---------- search (hybrid keyword + vector, served from Tiger Data) ----------
@@ -202,11 +287,60 @@ function dist(c) {
 }
 
 // ---------- capture flow ----------
-$('captureBtn').onclick = () => $('photoInput').click();
-$('photoInput').onchange = async (e) => {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
+let stream = null;
+$('captureBtn').onclick = async () => {
+  if (!walker.name && !(await askName())) return;
+  openCamera();
+};
+
+async function openCamera() {
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error('no camera api');
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false,
+    });
+    $('cameraVideo').srcObject = stream;
+    $('camera').showModal();
+  } catch {
+    $('photoInput').click(); // no live camera (denied, desktop, old browser): fall back to the system picker
+  }
+}
+
+function closeCamera() {
+  stream?.getTracks().forEach((t) => t.stop());
+  stream = null;
+  $('cameraVideo').srcObject = null;
+  if ($('camera').open) $('camera').close();
+}
+$('cameraClose').onclick = closeCamera;
+$('camera').addEventListener('cancel', closeCamera);
+$('cameraUpload').onclick = () => $('libraryInput').click();
+
+$('shutter').onclick = async () => {
+  const v = $('cameraVideo');
+  if (!v.videoWidth) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = v.videoWidth;
+  canvas.height = v.videoHeight;
+  canvas.getContext('2d').drawImage(v, 0, 0);
+  const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.9));
+  $('camera').classList.add('flash');
+  setTimeout(() => $('camera').classList.remove('flash'), 180);
+  closeCamera();
+  handlePhoto(new File([blob], 'camera.jpg', { type: 'image/jpeg' }));
+};
+
+for (const id of ['photoInput', 'libraryInput']) {
+  $(id).onchange = (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    closeCamera();
+    handlePhoto(file);
+  };
+}
+
+async function handlePhoto(file) {
   try {
     const where = await whereWasThis(file);
     if (!where) return;
@@ -214,7 +348,7 @@ $('photoInput').onchange = async (e) => {
   } catch (err) {
     showError(err.message || 'Something went wrong.');
   }
-};
+}
 
 // Location priority: the photo's own GPS (great for uploading later), then the device, then a tap on the map.
 async function whereWasThis(file) {
@@ -249,12 +383,20 @@ async function submit(file, where) {
   body.append('photo', small, 'photo.jpg');
   body.append('lat', where.lat);
   body.append('lng', where.lng);
+  body.append('walker_id', walker.id);
   try {
     const res = await fetch('/api/sightings', { method: 'POST', body });
     const data = await res.json();
+    if (data.code === 'name_required') {
+      closeResult();
+      walker.name = null;
+      if (await askName()) return submit(file, where);
+      return;
+    }
     if (!res.ok) throw new Error(data.error || 'Could not score that photo.');
     showVerdict(data);
     await loadCells();
+    loadLeaders();
     const cell = cells.find((c) => Math.abs(c.lat - Math.round(where.lat * 100) / 100) < 1e-6 && Math.abs(c.lng - Math.round(where.lng * 100) / 100) < 1e-6);
     centerOn(where.lat, where.lng, 14, true);
     if (cell) $('doneBtn').onclick = () => { closeResult(); focusCell(cell); };
@@ -350,7 +492,6 @@ const currentTheme = () => document.documentElement.dataset.theme || (systemDark
 const syncThemeBtn = () => {
   const t = currentTheme();
   $('themeBtn').dataset.mode = t;
-  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', t === 'dark' ? '#16150f' : '#f3ede2'));
 };
 $('themeBtn').onclick = () => {
   const next = currentTheme() === 'dark' ? 'light' : 'dark';
@@ -365,6 +506,7 @@ $('panel').querySelector('.grip').onclick = () => $('panel').classList.toggle('c
 map.on('dragstart', () => innerWidth <= 820 && $('panel').classList.add('collapsed'));
 
 loadCells({ fit: true }).catch(() => {});
+loadLeaders();
 locate();
 
 // ?demo=<photo-url>: scripted walkthrough for recording (see demo.js)
@@ -373,5 +515,10 @@ if (demo.has('demo')) {
   import('/demo.js').then((m) => m.run({
     mode: demo.get('demo'), photoUrl: demo.get('photo'), query: demo.get('q'), spot: Number(demo.get('spot') ?? 0),
     submit, where: AT ?? { lat: 40.7794, lng: -73.9632 },
+    ensureName: async (name) => {
+      if (walker.name) return;
+      const res = await fetch('/api/walkers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: walker.id, name }) });
+      if (res.ok) { walker.name = (await res.json()).name; saveWalker(); }
+    },
   }));
 }

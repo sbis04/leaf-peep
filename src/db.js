@@ -31,12 +31,81 @@ export const toCell = (v) => Number((Math.round(v / CELL) * CELL).toFixed(2));
 
 export async function insertSighting(s) {
   const doc = docFor(s);
-  await pool.query(
-    `INSERT INTO sightings (cell_lat, cell_lng, stage, color_score, colors, trees, scene, note, photo_key, model, embedding, search)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, to_tsvector('english', $12))`,
+  const { rows } = await pool.query(
+    `INSERT INTO sightings (cell_lat, cell_lng, stage, color_score, colors, trees, scene, note, photo_key, model, embedding, search, walker_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, to_tsvector('english', $12), $13)
+     RETURNING id, time`,
     [toCell(s.lat), toCell(s.lng), s.stage, s.colorScore, s.colors, s.trees, s.scene, s.note, s.photoKey, s.model,
-      toVector(await embed(doc)), doc],
+      toVector(await embed(doc)), doc, s.walkerId ?? null],
   );
+  return rows[0];
+}
+
+// ---------- walkers, likes, leaderboard ----------
+export async function upsertWalker(id, name) {
+  const { rows } = await pool.query(
+    `INSERT INTO walkers (id, name) VALUES ($1, $2)
+     ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name RETURNING id, name`, [id, name]);
+  return rows[0];
+}
+
+export async function getWalker(id) {
+  const { rows } = await pool.query('SELECT id, name FROM walkers WHERE id = $1', [id]);
+  return rows[0] ?? null;
+}
+
+export async function toggleLike(sightingId, walkerId) {
+  const del = await pool.query('DELETE FROM likes WHERE sighting_id = $1 AND walker_id = $2', [sightingId, walkerId]);
+  if (!del.rowCount) await pool.query('INSERT INTO likes (sighting_id, walker_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [sightingId, walkerId]);
+  const { rows } = await pool.query('SELECT count(*)::int AS n FROM likes WHERE sighting_id = $1', [sightingId]);
+  return { liked: !del.rowCount, likes: rows[0].n };
+}
+
+export async function leaderboard(limit = 10) {
+  const { rows } = await pool.query(
+    `SELECT w.name, count(DISTINCT s.id)::int AS photos, count(l.walker_id)::int AS likes
+     FROM walkers w
+     JOIN sightings s ON s.walker_id = w.id
+     LEFT JOIN likes l ON l.sighting_id = s.id
+     GROUP BY w.id, w.name
+     ORDER BY photos DESC, likes DESC, min(s.time)
+     LIMIT $1`, [limit]);
+  return rows;
+}
+
+// Removes a photo and everything hanging off it (moderation). Returns its photo key so the file can go too.
+export async function deleteSighting(id) {
+  const { rows } = await pool.query('DELETE FROM sightings WHERE id = $1 RETURNING photo_key', [id]);
+  await pool.query('DELETE FROM likes WHERE sighting_id = $1', [id]);
+  return rows[0]?.photo_key ?? null;
+}
+
+// ---------- admin analytics ----------
+export async function adminSummary() {
+  const one = (sql, p = []) => pool.query(sql, p).then((r) => r.rows);
+  const [totals] = await one(
+    `SELECT (SELECT count(*) FROM sightings)::int AS photos,
+            (SELECT count(*) FROM sightings WHERE time > now() - interval '24 hours')::int AS photos_24h,
+            (SELECT count(*) FROM walkers)::int AS walkers,
+            (SELECT count(*) FROM walkers WHERE created_at > now() - interval '24 hours')::int AS walkers_24h,
+            (SELECT count(*) FROM likes)::int AS likes,
+            (SELECT count(*) FROM likes WHERE created_at > now() - interval '24 hours')::int AS likes_24h,
+            (SELECT count(DISTINCT (cell_lat, cell_lng)) FROM sightings)::int AS spots,
+            (SELECT round(avg(color_score))::int FROM sightings WHERE time > now() - interval '24 hours') AS avg_score_24h`);
+  const perHour = await one(
+    `SELECT b.hour, coalesce(c.n, 0)::int AS photos
+     FROM generate_series(time_bucket('1 hour', now()) - interval '23 hours', time_bucket('1 hour', now()), interval '1 hour') AS b(hour)
+     LEFT JOIN (SELECT time_bucket('1 hour', time) AS hour, count(*) AS n FROM sightings
+                WHERE time > now() - interval '24 hours' GROUP BY 1) c USING (hour)
+     ORDER BY b.hour`);
+  const stages = await one(
+    `SELECT stage, count(*)::int AS n FROM sightings WHERE time > now() - interval '7 days' GROUP BY stage`);
+  const recent = await one(
+    `SELECT s.id, s.time, s.color_score, s.stage, s.trees, s.note, s.photo_key, s.cell_lat, s.cell_lng, s.model,
+            w.name AS walker, (SELECT count(*) FROM likes l WHERE l.sighting_id = s.id)::int AS likes
+     FROM sightings s LEFT JOIN walkers w ON w.id = s.walker_id
+     ORDER BY s.time DESC LIMIT 24`);
+  return { totals, perHour, stages, recent, top: await leaderboard(10), at: new Date().toISOString() };
 }
 
 // Fill in embeddings for rows written before search existed (or seeded by hand).
@@ -101,7 +170,7 @@ export async function searchCells(q, { days = 21, limit = 8 } = {}) {
 // One row per grid cell with its current colour, trend and a forecast for when it peaks.
 // The trend is a least-squares fit over the cell's daily averages (from the continuous aggregate).
 const PEAK = 85;
-export async function cellForecasts({ days = 21 } = {}) {
+export async function cellForecasts({ days = 21, me = null } = {}) {
   const { rows } = await pool.query(
     `WITH d AS (
        SELECT cell_lat, cell_lng, day, score, photos
@@ -121,17 +190,20 @@ export async function cellForecasts({ days = 21 } = {}) {
        FROM d ORDER BY cell_lat, cell_lng, day DESC
      ),
      last_photo AS (
-       SELECT DISTINCT ON (cell_lat, cell_lng) cell_lat, cell_lng, photo_key, note, trees, stage, time
+       SELECT DISTINCT ON (cell_lat, cell_lng) cell_lat, cell_lng, id, walker_id, photo_key, note, trees, stage, time
        FROM sightings
        WHERE time > now() - make_interval(days => $1)
        ORDER BY cell_lat, cell_lng, time DESC
      )
      SELECT f.cell_lat, f.cell_lng, l.latest, l.last_day, f.slope_per_day, f.days_seen, f.photos, f.best,
-            p.photo_key, p.note, p.trees, p.stage, p.time AS last_time
+            p.photo_key, p.note, p.trees, p.stage, p.time AS last_time, p.id AS sighting_id, w.name AS walker,
+            (SELECT count(*) FROM likes k WHERE k.sighting_id = p.id)::int AS likes,
+            EXISTS (SELECT 1 FROM likes k WHERE k.sighting_id = p.id AND k.walker_id = $2::uuid) AS liked
      FROM fit f
      JOIN latest l USING (cell_lat, cell_lng)
-     LEFT JOIN last_photo p USING (cell_lat, cell_lng)`,
-    [days],
+     LEFT JOIN last_photo p USING (cell_lat, cell_lng)
+     LEFT JOIN walkers w ON w.id = p.walker_id`,
+    [days, me],
   );
   return rows.map((r) => ({ ...r, forecast: forecast(r) }));
 }

@@ -45,3 +45,24 @@ ALTER TABLE sightings ADD COLUMN IF NOT EXISTS embedding vector(384);     -- all
 ALTER TABLE sightings ADD COLUMN IF NOT EXISTS search    tsvector;        -- full-text of the same text
 CREATE INDEX IF NOT EXISTS sightings_embedding ON sightings USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS sightings_search ON sightings USING gin (search);
+
+-- Walkers: anonymous display names, chosen on the first photo. No email, no password.
+CREATE TABLE IF NOT EXISTS walkers (
+  id         UUID PRIMARY KEY,
+  name       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Every sighting gets an id (for likes and moderation) and the walker who posted it.
+ALTER TABLE sightings ADD COLUMN IF NOT EXISTS id UUID NOT NULL DEFAULT gen_random_uuid();
+ALTER TABLE sightings ADD COLUMN IF NOT EXISTS walker_id UUID;
+CREATE INDEX IF NOT EXISTS sightings_id ON sightings (id);
+CREATE INDEX IF NOT EXISTS sightings_walker ON sightings (walker_id, time DESC);
+
+-- Likes: one per visitor per photo.
+CREATE TABLE IF NOT EXISTS likes (
+  sighting_id UUID NOT NULL,
+  walker_id   UUID NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (sighting_id, walker_id)
+);

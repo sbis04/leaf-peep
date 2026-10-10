@@ -1,6 +1,6 @@
 // Photo storage: DigitalOcean Spaces when SPACES_BUCKET is set, local disk otherwise.
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { mkdir, writeFile, unlink } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
@@ -31,6 +31,14 @@ export async function savePhoto(jpeg) {
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, jpeg);
   return { key, url: `/uploads/${key}` };
+}
+
+export async function deletePhoto(key) {
+  if (!key) return;
+  if (s3) return s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+  const file = path.join(LOCAL_DIR, key);
+  if (!file.startsWith(LOCAL_DIR + path.sep)) return; // never step outside the uploads folder
+  await unlink(file).catch((err) => { if (err.code !== 'ENOENT') throw err; });
 }
 
 export function photoUrl(key) {
