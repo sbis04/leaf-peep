@@ -315,7 +315,9 @@ $('captureBtn').onclick = async () => {
 };
 
 // ?fakecam=<video url>: demo/recording only. Plays a looping clip as the viewfinder; shutter and scoring stay real.
-const FAKECAM = new URLSearchParams(location.search).get('fakecam');
+// On localhost (development and recordings) the demo viewfinder is always used; the Simulator's camera is a test pattern.
+const FAKECAM = new URLSearchParams(location.search).get('fakecam')
+  ?? (/^(127\.0\.0\.1|localhost)$/.test(location.hostname) ? '/demo/viewfinder.mp4' : null);
 
 async function openCamera() {
   if (FAKECAM && FAKECAM.startsWith('/demo/')) {
@@ -337,16 +339,6 @@ async function openCamera() {
     $('camera').classList.remove('nocam');
     $('camera').showModal();
   } catch {
-    // Local development only: the iOS Simulator has no camera, so play the demo viewfinder clip instead.
-    if (/^(127\.0\.0\.1|localhost)$/.test(location.hostname)) {
-      const v = $('cameraVideo');
-      v.src = '/demo/viewfinder.mp4';
-      v.loop = true;
-      $('camera').classList.remove('nocam');
-      $('camera').showModal();
-      v.play().catch(() => {});
-      return;
-    }
     // No live camera (denied, simulator, old browser). Browsers only open the file picker from a direct tap,
     // so show the camera sheet with its Upload button instead of trying to open the picker from code.
     $('camera').classList.add('nocam');
