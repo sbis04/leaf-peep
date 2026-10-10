@@ -28,7 +28,7 @@ const swatchFor = (w) => COLOR_WORDS[w.toLowerCase()] ?? COLOR_WORDS[w.toLowerCa
 
 // ---------- iPhone Safari tab: one-time hint to add to the Home Screen for full screen ----------
 const iosTab = /iPhone|iPod/.test(navigator.userAgent) && !navigator.standalone && !matchMedia('(display-mode: standalone)').matches;
-if (iosTab) {
+if (iosTab && !/[?&](fakecam|demo|fresh)=?/.test(location.search)) {
   let seen = false;
   try { seen = localStorage.getItem('lp.a2hs') === '1'; } catch { /* storage blocked */ }
   if (!seen) {
@@ -44,6 +44,7 @@ if (iosTab) {
 // A random id lives on this device; a name is asked for only before the first photo. No account, no email.
 const walker = (() => {
   let w = null;
+  if (new URLSearchParams(location.search).has('fresh')) { try { localStorage.removeItem('lp.walker'); } catch { /* ignore */ } }
   try { w = JSON.parse(localStorage.getItem('lp.walker') || 'null'); } catch { /* storage blocked */ }
   if (!w?.id) w = { id: crypto.randomUUID(), name: null };
   return w;
