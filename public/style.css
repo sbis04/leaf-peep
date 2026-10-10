@@ -463,3 +463,5 @@ html, body { overflow: hidden; overscroll-behavior: none; }
 
 /* iOS zooms the page when a focused field's text is under 16px; keep every input at 16px or more */
 input, textarea, select { font-size: max(16px, 1em); }
+.like span:empty { display: none; }
+.like { justify-content: center; min-width: 44px; }
