@@ -26,37 +26,18 @@ const COLOR_WORDS = {
 };
 const swatchFor = (w) => COLOR_WORDS[w.toLowerCase()] ?? COLOR_WORDS[w.toLowerCase().split(/\s|-/).pop()] ?? '#b9ad99';
 
-// ---------- iPhone Safari: let the map run under the status bar ----------
+// ---------- iPhone Safari tab: one-time hint to add to the Home Screen for full screen ----------
 const iosTab = /iPhone|iPod/.test(navigator.userAgent) && !navigator.standalone && !matchMedia('(display-mode: standalone)').matches;
 if (iosTab) {
-  const BLEED = 60;
-  window.BLEED_BOTTOM = 90;
-  history.scrollRestoration = 'manual';
-  document.documentElement.style.setProperty('--bleed', `${BLEED}px`);
-  document.documentElement.style.setProperty('--bleed-bottom', `${window.BLEED_BOTTOM}px`);
-  document.documentElement.classList.add('ios-bleed');
-  // Safari resets the scroll on load, after the keyboard, after dialogs and when the tab returns; re-apply each time.
-  const pin = () => { if (Math.abs(scrollY - BLEED) > 1) scrollTo(0, BLEED); };
-  window.pinBleed = pin;
-  for (const ms of [0, 60, 200, 500, 1000, 2000, 3500]) setTimeout(pin, ms);
-  addEventListener('load', () => { pin(); setTimeout(pin, 300); });
-  addEventListener('pageshow', pin);
-  addEventListener('resize', pin);
-  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && setTimeout(pin, 100));
-  document.addEventListener('focusout', () => setTimeout(pin, 350)); // keyboard closed
-  document.addEventListener('close', () => setTimeout(pin, 50), true); // any <dialog> closed
-  addEventListener('scroll', () => { clearTimeout(pin.t); pin.t = setTimeout(pin, 200); }, { passive: true });
-}
-
-if (new URLSearchParams(location.search).has('debug')) {
-  const box = document.createElement('div');
-  box.style.cssText = 'position:fixed;left:8px;top:45%;z-index:99999;background:#000c;color:#0f0;font:12px monospace;padding:6px 8px;border-radius:8px;white-space:pre;pointer-events:none';
-  document.body.append(box);
-  const tick = () => {
-    box.textContent = `scrollY ${Math.round(scrollY)}  inner ${innerWidth}x${innerHeight}\nvv ${Math.round(visualViewport?.height ?? 0)} off ${Math.round(visualViewport?.offsetTop ?? 0)}\ndocH ${document.documentElement.scrollHeight}  bleed ${document.documentElement.classList.contains('ios-bleed')}\nua ${/iPhone/.test(navigator.userAgent)} standalone ${navigator.standalone}`;
-    requestAnimationFrame(tick);
-  };
-  tick();
+  let seen = false;
+  try { seen = localStorage.getItem('lp.a2hs') === '1'; } catch { /* storage blocked */ }
+  if (!seen) {
+    const tip = document.createElement('div');
+    tip.className = 'a2hs';
+    tip.innerHTML = '<span>For full screen, tap <b>Share</b> then <b>Add to Home Screen</b>.</span><button type="button" aria-label="Dismiss">✕</button>';
+    tip.querySelector('button').onclick = () => { tip.remove(); try { localStorage.setItem('lp.a2hs', '1'); } catch { /* ignore */ } };
+    setTimeout(() => document.body.append(tip), 2500);
+  }
 }
 
 // ---------- anonymous walker ----------
@@ -541,11 +522,7 @@ syncThemeBtn();
 
 // ---------- bottom sheet (phones): drag the grip or header between peek, half and full ----------
 const mobile = () => innerWidth <= 820;
-// heights are what's visible; on iPhone Safari the sheet also extends BLEED_BOTTOM under the toolbar
-const snaps = () => {
-  const extra = window.BLEED_BOTTOM ?? 0;
-  return { peek: 190 + extra, half: Math.round(innerHeight * 0.52) + extra, full: Math.round(innerHeight * 0.88) + extra };
-};
+const snaps = () => ({ peek: 190, half: Math.round(innerHeight * 0.52), full: Math.round(innerHeight * 0.88) });
 let sheet = 'half';
 function setSheet(state) {
   if (!mobile()) return;
@@ -554,7 +531,6 @@ function setSheet(state) {
   panel.style.setProperty('--sheet-h', `${snaps()[state]}px`);
   panel.classList.toggle('collapsed', state === 'peek');
   if (state === 'peek') panel.scrollTop = 0;
-  window.pinBleed?.();
 }
 (() => {
   const panel = $('panel');
@@ -596,7 +572,6 @@ function setSheet(state) {
   setSheet('half');
 })();
 map.on('dragstart', () => mobile() && setSheet('peek'));
-map.on('moveend', () => window.pinBleed?.());
 
 loadCells({ fit: true }).catch(() => {});
 loadLeaders();

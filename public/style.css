@@ -416,19 +416,20 @@ body { background: transparent; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --map-land: #1c1b1a; } }
 :root[data-theme="dark"] { --map-land: #1c1b1a; }
 
-/* iPhone Safari (not home-screen): Safari only shows page content under its translucent status bar when the page
-   is scrolled, so the app is made a little taller than the screen and pre-scrolled by that much. */
-html.ios-bleed, html.ios-bleed body { height: auto; overflow-x: hidden; }
-html.ios-bleed .app { position: absolute; top: 0; left: 0; right: 0; bottom: auto; height: calc(100lvh + var(--bleed) + var(--bleed-bottom, 0px)); }
-/* the sheet runs on under Safari's bottom toolbar and home indicator; its content stays scrollable clear of them */
-html.ios-bleed .panel { padding-bottom: calc(56px + var(--bleed-bottom, 0px) + env(safe-area-inset-bottom)); }
-html.ios-bleed { background: var(--paper); }
-html.ios-bleed .pin-banner { top: calc(16px + var(--bleed)); }
-html.ios-bleed .leaflet-top { top: var(--bleed); }
-
-html.ios-bleed { overscroll-behavior-y: none; }
 
 .camera-none { display: none; position: absolute; left: 24px; right: 24px; top: 42%; margin: 0; text-align: center; font: 500 17px/1.45 var(--sans); color: #fff; }
 .camera.nocam .camera-none { display: block; }
 .camera.nocam .camera-frame, .camera.nocam .shutter { opacity: .25; pointer-events: none; }
 .camera.nocam .cam-upload { background: #fff; color: #111; }
+
+/* one-time "Add to Home Screen" hint on iPhone Safari */
+.a2hs {
+  position: fixed; z-index: 1200; left: 12px; right: 12px; top: calc(10px + env(safe-area-inset-top));
+  display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; border-radius: 16px;
+  background: color-mix(in srgb, var(--paper) 88%, transparent); color: var(--ink);
+  backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: var(--shadow); font: 500 14px/1.35 var(--sans); animation: a2hs-in .35s ease-out;
+}
+.a2hs span { flex: 1; }
+.a2hs button { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 0; background: var(--paper-2); color: var(--ink-2); font-size: 13px; cursor: pointer; }
+@keyframes a2hs-in { from { transform: translateY(-12px); opacity: 0; } }
