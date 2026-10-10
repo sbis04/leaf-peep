@@ -4,7 +4,7 @@
 
 ![Leaf Peep on iPhone: the map, a scored tree, and a forecast in dark mode](docs/img/iphone-hero.jpg)
 
-**[Open the app](https://leafpeep.souvikbiswas.com)** · **[Landing page](https://sbis04.github.io/leaf-peep/)** · **[Demo video](https://youtu.be/uMD2_-Qsu6A)** · Built for the [Hacktoberfest 2026 Open-Source AI Challenge: Touch Grass](https://dev.to/challenges/hacktoberfest-week1-2026-10-05)
+**[Open the app](https://leafpeep.souvikbiswas.com)** · **[Landing page](https://sbis04.github.io/leaf-peep/)** · **[Demo video](https://youtu.be/SgBCyLa2i1g)** · Built for the [Hacktoberfest 2026 Open-Source AI Challenge: Touch Grass](https://dev.to/challenges/hacktoberfest-week1-2026-10-05)
 
 ## What it does
 
